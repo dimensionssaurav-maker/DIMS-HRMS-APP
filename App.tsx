@@ -1,4 +1,5 @@
-
+import { db } from "./firebase";
+import { collection, addDoc } from "firebase/firestore";
 import React, { useState, useMemo, useEffect } from 'react';
 import Layout from './components/Layout.tsx';
 import Dashboard from './components/Dashboard.tsx';
@@ -30,7 +31,7 @@ import {
 import { 
   INITIAL_EMPLOYEES, INITIAL_SHIFTS, INITIAL_CLAIMS, 
   INITIAL_LEAVES, INITIAL_LOANS, INITIAL_DEPARTMENTS 
-} from './constants.ts';
+} from './constants';
 import { calculateMonthlyPayroll } from './utils/calculations.ts';
 
 // --- Local Storage Helper ---
@@ -175,10 +176,18 @@ export default function App() {
     pendingClaims: claims.filter(c => c.status === 'Under Review').length
   };
 
-  const handleAddEmployee = (emp: Employee) => {
+  const handleAddEmployee = async (emp: Employee) => {
+  try {
+    await addDoc(collection(db, "employees"), emp);
+
     setEmployees([...employees, emp]);
     setShowOnboarding(false);
-  };
+
+    console.log("Employee saved to Firebase");
+  } catch (error) {
+    console.error("Error saving employee:", error);
+  }
+};
 
   const renderContent = () => {
     switch (activeTab) {
