@@ -1,4 +1,5 @@
-
+import { db } from "../firebase";
+import { collection, addDoc } from "firebase/firestore";
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, UserPlus, Edit2, Trash2, Building2, ArrowUpDown, ArrowUp, ArrowDown, AlertCircle, X, Save, Clock, Users, Wifi, ClipboardCopy, ArrowRight, Briefcase, IndianRupee, MapPin, Share2, Percent, MoreHorizontal, UserX, UserCheck, Calendar, RotateCcw, User, Camera, Check, FileText, Download } from 'lucide-react';
 import { Employee, Shift, PayrollConfig } from '../types';
