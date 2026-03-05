@@ -26,12 +26,12 @@ import LeftEmployeesReportSection from './components/LeftEmployeesReportSection.
 import { 
   Employee, AttendanceRecord, Expense, ExpenseClaim, LeaveRequest, 
   Shift, Loan, PayrollConfig, Holiday, ExpenseCategory, SystemUser 
-} from './types.tsx';
+} from './types.ts';
 import { 
   INITIAL_EMPLOYEES, INITIAL_SHIFTS, INITIAL_CLAIMS, 
   INITIAL_LEAVES, INITIAL_LOANS, INITIAL_DEPARTMENTS 
-} from './constants.tsx';
-import { calculateMonthlyPayroll } from './utils/calculations.tsx';
+} from './constants.ts';
+import { calculateMonthlyPayroll } from './utils/calculations.ts';
 
 // --- Local Storage Helper ---
 function useLocalStorage<T>(key: string, initialValue: T) {
