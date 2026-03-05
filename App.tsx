@@ -1,37 +1,37 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import Layout from './components/Layout'tsx;
-import Dashboard from './components/Dashboard'tsx;
-import EmployeeManagement from './components/EmployeeManagement'tsx;
-import AttendanceTracker from './components/AttendanceTracker'tsx;
-import LeaveManagement from './components/LeaveManagement'tsx;
-import ShiftManagement from './components/ShiftManagement'tsx;
-import PayrollCalculator from './components/PayrollCalculator'tsx;
-import ExpenseTracker from './components/ExpenseTracker'tsx;
-import OvertimeModule from './components/OvertimeModule'tsx;
-import LoanManagement from './components/LoanManagement'tsx;
-import SettingsModule from './components/SettingsModule'tsx;
-import EmployeeOnboarding from './components/EmployeeOnboarding'tsx;
-import AIChatBot from './components/AIChatBot'tsx;
+import Layout from './components/Layout.tsx';
+import Dashboard from './components/Dashboard.tsx';
+import EmployeeManagement from './components/EmployeeManagement.tsx';
+import AttendanceTracker from './components/AttendanceTracker.tsx';
+import LeaveManagement from './components/LeaveManagement.tsx';
+import ShiftManagement from './components/ShiftManagement.tsx';
+import PayrollCalculator from './components/PayrollCalculator.tsx';
+import ExpenseTracker from './components/ExpenseTracker.tsx';
+import OvertimeModule from './components/OvertimeModule.tsx';
+import LoanManagement from './components/LoanManagement.tsx';
+import SettingsModule from './components/SettingsModule.tsx';
+import EmployeeOnboarding from './components/EmployeeOnboarding.tsx';
+import AIChatBot from './components/AIChatBot.tsx';
 
 // Report Components
-import ESICReportSection from './components/ESICReportSection'tsx;
-import LWFReportSection from './components/LWFReportSection'tsx;
-import ExpenseReportSection from './components/ExpenseReportSection'tsx;
-import YearlyExpenseReportSection from './components/YearlyExpenseReportSection'tsx;
-import LoanRecoveryReportSection from './components/LoanRecoveryReportSection'tsx;
-import LateReportSection from './components/LateReportSection'tsx;
-import LeftEmployeesReportSection from './components/LeftEmployeesReportSection'tsx;
+import ESICReportSection from './components/ESICReportSection.tsx';
+import LWFReportSection from './components/LWFReportSection.tsx';
+import ExpenseReportSection from './components/ExpenseReportSection.tsx';
+import YearlyExpenseReportSection from './components/YearlyExpenseReportSection.tsx';
+import LoanRecoveryReportSection from './components/LoanRecoveryReportSection.tsx';
+import LateReportSection from './components/LateReportSection.tsx';
+import LeftEmployeesReportSection from './components/LeftEmployeesReportSection.tsx';
 
 import { 
   Employee, AttendanceRecord, Expense, ExpenseClaim, LeaveRequest, 
   Shift, Loan, PayrollConfig, Holiday, ExpenseCategory, SystemUser 
-} from './types'tsx;
+} from './types.tsx';
 import { 
   INITIAL_EMPLOYEES, INITIAL_SHIFTS, INITIAL_CLAIMS, 
   INITIAL_LEAVES, INITIAL_LOANS, INITIAL_DEPARTMENTS 
-} from './constants'tsx;
-import { calculateMonthlyPayroll } from './utils/calculations'tsx;
+} from './constants.tsx';
+import { calculateMonthlyPayroll } from './utils/calculations.tsx';
 
 // --- Local Storage Helper ---
 function useLocalStorage<T>(key: string, initialValue: T) {
