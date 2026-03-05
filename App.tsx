@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 
 import { db } from "./firebase";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs } from "firebase/firestore";
 
 import Layout from './components/Layout.tsx';
 import Dashboard from './components/Dashboard.tsx';
@@ -116,7 +116,33 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Persistent Data States
-  const [employees, setEmployees] = useLocalStorage<Employee[]>('zenhr_employees', INITIAL_EMPLOYEES || []);
+  const [employees, setEmployees] = useLocalStorage<Employee[]>(
+  'zenhr_employees',
+  INITIAL_EMPLOYEES || []
+);
+
+useEffect(() => {
+
+  const loadEmployees = async () => {
+    try {
+
+      const querySnapshot = await getDocs(collection(db, "employees"));
+
+      const firebaseEmployees = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      setEmployees(firebaseEmployees as Employee[]);
+
+    } catch (error) {
+      console.error("Error loading employees:", error);
+    }
+  };
+
+  loadEmployees();
+
+}, []);
   const [attendanceRecords, setAttendanceRecords] = useLocalStorage<AttendanceRecord[]>('zenhr_attendance', []);
   const [expenses] = useLocalStorage<Expense[]>('zenhr_expenses', []); 
   const [claims, setClaims] = useLocalStorage<ExpenseClaim[]>('zenhr_claims', INITIAL_CLAIMS || []);
