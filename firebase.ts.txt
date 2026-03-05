@@ -1,0 +1,14 @@
+import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDAWLYZfEHUrHWVOM_Y001kjmtetBBCtQ",
+  authDomain: "hrms-factory.firebaseapp.com",
+  projectId: "hrms-factory",
+  storageBucket: "hrms-factory.appspot.com",
+  messagingSenderId: "621141789787",
+  appId: "1:621141789787:web:cb25f6cc62b7f43baa837e"
+};
+
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
