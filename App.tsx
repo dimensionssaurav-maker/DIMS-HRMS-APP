@@ -128,14 +128,7 @@ useEffect(() => {
       const firebaseEmployees = await getData("employees");
 setEmployees(firebaseEmployees as Employee[]);
 
-      const firebaseEmployees = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      setEmployees(firebaseEmployees as Employee[]);
-
-    } catch (error) {
+          } catch (error) {
       console.error("Error loading employees:", error);
     }
   };
