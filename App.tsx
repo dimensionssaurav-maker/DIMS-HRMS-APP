@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 
-import { db } from "./firebase";
-import { collection, addDoc, getDocs } from "firebase/firestore";
+import { addData, getData } from "./services/firebaseService"
 
 import Layout from './components/Layout.tsx';
 import Dashboard from './components/Dashboard.tsx';
@@ -126,7 +125,8 @@ useEffect(() => {
   const loadEmployees = async () => {
     try {
 
-      const querySnapshot = await getDocs(collection(db, "employees"));
+      const firebaseEmployees = await getData("employees");
+setEmployees(firebaseEmployees as Employee[]);
 
       const firebaseEmployees = querySnapshot.docs.map(doc => ({
         id: doc.id,
@@ -206,7 +206,7 @@ useEffect(() => {
 
   const handleAddEmployee = async (emp: Employee) => {
   try {
-    await addDoc(collection(db, "employees"), emp);
+    await addData("employees", emp);
 
     setEmployees([...employees, emp]);
     setShowOnboarding(false);
