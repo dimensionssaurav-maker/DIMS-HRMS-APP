@@ -143,7 +143,53 @@ setEmployees(firebaseEmployees as Employee[]);
     const data = await getData("attendance");
     setAttendanceRecords(data as AttendanceRecord[]);
   };
+// LOAD LEAVES FROM FIREBASE
+useEffect(() => {
 
+  const loadLeaves = async () => {
+    const data = await getData("leaves");
+    setLeaveRequests(data as LeaveRequest[]);
+  };
+
+  loadLeaves();
+
+}, []);
+
+// LOAD SHIFTS FROM FIREBASE
+useEffect(() => {
+
+  const loadShifts = async () => {
+    const data = await getData("shifts");
+    setShifts(data as Shift[]);
+  };
+
+  loadShifts();
+
+}, []);
+
+// LOAD LOANS FROM FIREBASE
+useEffect(() => {
+
+  const loadLoans = async () => {
+    const data = await getData("loans");
+    setLoans(data as Loan[]);
+  };
+
+  loadLoans();
+
+}, []);
+
+// LOAD CLAIMS FROM FIREBASE
+useEffect(() => {
+
+  const loadClaims = async () => {
+    const data = await getData("claims");
+    setClaims(data as ExpenseClaim[]);
+  };
+
+  loadClaims();
+
+}, []);
   loadAttendance();
 
 }, []);
