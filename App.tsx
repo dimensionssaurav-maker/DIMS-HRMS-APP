@@ -261,21 +261,33 @@ setEmployees(firebaseEmployees as Employee[]);
             records={attendanceRecords}
             holidays={holidays}
             payrollConfig={payrollConfig}
-            onUpdate={(record) => {
-               const existingIdx = attendanceRecords.findIndex(r => r.employeeId === record.employeeId && r.date === record.date);
-               if (existingIdx >= 0) {
-                  const newRecords = [...attendanceRecords];
-                  newRecords[existingIdx] = record;
-                  setAttendanceRecords(newRecords);
-               } else {
-                  setAttendanceRecords([...attendanceRecords, record]);
-               }
-            }}
-            onBulkUpdate={(newRecords) => {
-               const newRecordKeys = new Set(newRecords.map(r => `${r.employeeId}-${r.date}`));
-               const filteredOld = attendanceRecords.filter(r => !newRecordKeys.has(`${r.employeeId}-${r.date}`));
-               setAttendanceRecords([...filteredOld, ...newRecords]);
-            }}
+            onUpdate={async (record) => {
+
+  await addData("attendance", record)
+
+  const existingIdx = attendanceRecords.findIndex(r => r.employeeId === record.employeeId && r.date === record.date)
+
+  if (existingIdx >= 0) {
+    const newRecords = [...attendanceRecords]
+    newRecords[existingIdx] = record
+    setAttendanceRecords(newRecords)
+  } else {
+    setAttendanceRecords([...attendanceRecords, record])
+  }
+
+}}
+            onBulkUpdate={async (newRecords) => {
+
+  for (const r of newRecords) {
+    await addData("attendance", r)
+  }
+
+  const newRecordKeys = new Set(newRecords.map(r => `${r.employeeId}-${r.date}`))
+  const filteredOld = attendanceRecords.filter(r => !newRecordKeys.has(`${r.employeeId}-${r.date}`))
+
+  setAttendanceRecords([...filteredOld, ...newRecords])
+
+}}
           />
         );
       case 'leaves':
