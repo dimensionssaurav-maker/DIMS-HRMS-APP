@@ -111,14 +111,14 @@ setEmployees(firebaseEmployees as Employee[]);
 
   const loadAttendance = async () => {
     const data = await getData("attendance");
-    setAttendanceRecords(data as AttendanceRecord[]);
+setAttendanceRecords(Array.isArray(data) ? data : []);
   };
 // LOAD LEAVES FROM FIREBASE
 useEffect(() => {
 
   const loadLeaves = async () => {
     const data = await getData("leaves");
-    setLeaveRequests(data as LeaveRequest[]);
+setLeaveRequests(Array.isArray(data) ? data : []);
   };
 
   loadLeaves();
@@ -130,7 +130,7 @@ useEffect(() => {
 
   const loadShifts = async () => {
     const data = await getData("shifts");
-    setShifts(data as Shift[]);
+setShifts(Array.isArray(data) ? data : []);
   };
 
   loadShifts();
@@ -142,7 +142,7 @@ useEffect(() => {
 
   const loadLoans = async () => {
     const data = await getData("loans");
-    setLoans(data as Loan[]);
+setLoans(Array.isArray(data) ? data : []);
   };
 
   loadLoans();
@@ -154,7 +154,7 @@ useEffect(() => {
 
   const loadClaims = async () => {
     const data = await getData("claims");
-    setClaims(data as ExpenseClaim[]);
+setClaims(Array.isArray(data) ? data : []);
   };
 
   loadClaims();
@@ -175,7 +175,7 @@ useEffect(() => {
   const loadEmployees = async () => {
     try {
       const data = await getData("employees");
-      setEmployees(data as Employee[]);
+setEmployees(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error loading employees:", error);
     }
