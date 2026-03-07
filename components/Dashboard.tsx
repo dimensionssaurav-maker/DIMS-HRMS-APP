@@ -186,7 +186,7 @@ const Dashboard: React.FC<Props> = ({
           <div className="h-[300px] w-full">
             {Array.isArray(dailyAttendanceData) && dailyAttendanceData.length > 0 ? (
 
-<ResponsiveContainer width="100%" height={300}>
+<ResponsiveContainer width="100%" height={100%}>
   <BarChart data={dailyAttendanceData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis 
