@@ -36,7 +36,7 @@ import {
 import { calculateMonthlyPayroll } from './utils/calculations.ts';
 
 // --- Local Storage Helper ---
-function useLocalStorage<T>(key: string, initialValue: T) {
+function useState<T>(key: string, initialValue: T) {
   const [storedValue, setStoredValue] = useState<T>(() => {
     try {
       if (typeof window === "undefined") {
@@ -115,7 +115,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Persistent Data States
-  const [employees, setEmployees] = useLocalStorage<Employee[]>(
+  const [employees, setEmployees] = useState<Employee[]>(
   'zenhr_employees',
   INITIAL_EMPLOYEES || []
 );
@@ -136,7 +136,7 @@ setEmployees(firebaseEmployees as Employee[]);
   loadEmployees();
 
 }, []);
-  const [attendanceRecords, setAttendanceRecords] = useLocalStorage<AttendanceRecord[]>('zenhr_attendance', []);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>('zenhr_attendance', []);
   useEffect(() => {
 
   const loadAttendance = async () => {
@@ -193,21 +193,21 @@ useEffect(() => {
   loadAttendance();
 
 }, []);
-  const [expenses] = useLocalStorage<Expense[]>('zenhr_expenses', []); 
-  const [claims, setClaims] = useLocalStorage<ExpenseClaim[]>('zenhr_claims', INITIAL_CLAIMS || []);
-  const [leaveRequests, setLeaveRequests] = useLocalStorage<LeaveRequest[]>('zenhr_leaves', INITIAL_LEAVES || []);
-  const [shifts, setShifts] = useLocalStorage<Shift[]>('zenhr_shifts', INITIAL_SHIFTS || []);
-  const [loans, setLoans] = useLocalStorage<Loan[]>('zenhr_loans', INITIAL_LOANS || []);
-  const [departments, setDepartments] = useLocalStorage<string[]>('zenhr_departments', INITIAL_DEPARTMENTS || []);
-  const [holidays, setHolidays] = useLocalStorage<Holiday[]>('zenhr_holidays', []);
+  const [expenses] = useState<Expense[]>('zenhr_expenses', []); 
+  const [claims, setClaims] = useState<ExpenseClaim[]>('zenhr_claims', INITIAL_CLAIMS || []);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>('zenhr_leaves', INITIAL_LEAVES || []);
+  const [shifts, setShifts] = useState<Shift[]>('zenhr_shifts', INITIAL_SHIFTS || []);
+  const [loans, setLoans] = useState<Loan[]>('zenhr_loans', INITIAL_LOANS || []);
+  const [departments, setDepartments] = useState<string[]>('zenhr_departments', INITIAL_DEPARTMENTS || []);
+  const [holidays, setHolidays] = useState<Holiday[]>('zenhr_holidays', []);
   
   // Persistent System Users
-  const [users, setUsers] = useLocalStorage<SystemUser[]>('zenhr_users', [
+  const [users, setUsers] = useState<SystemUser[]>('zenhr_users', [
     { id: 'u1', name: 'Admin User', email: 'admin@zenhr.com', role: 'Admin', status: 'Active', lastLogin: '2024-10-25 09:00 AM', isLocked: true }
   ]);
 
   // Persistent Config
-  const [payrollConfig, setPayrollConfig] = useLocalStorage<PayrollConfig>('zenhr_payroll_config', {
+  const [payrollConfig, setPayrollConfig] = useState<PayrollConfig>('zenhr_payroll_config', {
     globalOtMultiplier: 1.5,
     designationOverrides: {},
     foodingConfig: { enabled: true, minHours: 4, amount: 50, departmentOverrides: {} },
