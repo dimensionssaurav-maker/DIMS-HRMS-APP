@@ -35,36 +35,6 @@ import {
 } from './constants';
 import { calculateMonthlyPayroll } from './utils/calculations.ts';
 
-// --- Local Storage Helper ---
-function useState<T>(key: string, initialValue: T) {
-  const [storedValue, setStoredValue] = useState<T>(() => {
-    try {
-      if (typeof window === "undefined") {
-        return initialValue;
-      }
-      const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
-    } catch (error) {
-      console.error(error);
-      return initialValue;
-    }
-  });
-
-  const setValue = (value: T | ((val: T) => T)) => {
-    try {
-      const valueToStore = value instanceof Function ? value(storedValue) : value;
-      setStoredValue(valueToStore);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(key, JSON.stringify(valueToStore));
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  return [storedValue, setValue] as const;
-}
-
 const ReportsModule = ({ 
   employees, payroll, expenses, loans, attendance, shifts 
 }: { 
@@ -200,6 +170,88 @@ useEffect(() => {
   const [loans, setLoans] = useState<Loan[]>('zenhr_loans', INITIAL_LOANS || []);
   const [departments, setDepartments] = useState<string[]>('zenhr_departments', INITIAL_DEPARTMENTS || []);
   const [holidays, setHolidays] = useState<Holiday[]>('zenhr_holidays', []);
+  // LOAD EMPLOYEES
+useEffect(() => {
+  const loadEmployees = async () => {
+    try {
+      const data = await getData("employees");
+      setEmployees(data as Employee[]);
+    } catch (error) {
+      console.error("Error loading employees:", error);
+    }
+  };
+  loadEmployees();
+}, []);
+
+
+// LOAD ATTENDANCE
+useEffect(() => {
+  const loadAttendance = async () => {
+    try {
+      const data = await getData("attendance");
+      setAttendanceRecords(data as AttendanceRecord[]);
+    } catch (error) {
+      console.error("Error loading attendance:", error);
+    }
+  };
+  loadAttendance();
+}, []);
+
+
+// LOAD LEAVES
+useEffect(() => {
+  const loadLeaves = async () => {
+    try {
+      const data = await getData("leaves");
+      setLeaveRequests(data as LeaveRequest[]);
+    } catch (error) {
+      console.error("Error loading leaves:", error);
+    }
+  };
+  loadLeaves();
+}, []);
+
+
+// LOAD SHIFTS
+useEffect(() => {
+  const loadShifts = async () => {
+    try {
+      const data = await getData("shifts");
+      setShifts(data as Shift[]);
+    } catch (error) {
+      console.error("Error loading shifts:", error);
+    }
+  };
+  loadShifts();
+}, []);
+
+
+// LOAD LOANS
+useEffect(() => {
+  const loadLoans = async () => {
+    try {
+      const data = await getData("loans");
+      setLoans(data as Loan[]);
+    } catch (error) {
+      console.error("Error loading loans:", error);
+    }
+  };
+  loadLoans();
+}, []);
+
+
+// LOAD CLAIMS
+useEffect(() => {
+  const loadClaims = async () => {
+    try {
+      const data = await getData("claims");
+      setClaims(data as ExpenseClaim[]);
+    } catch (error) {
+      console.error("Error loading claims:", error);
+    }
+  };
+  loadClaims();
+}, []);
   
   // Persistent System Users
   const [users, setUsers] = useState<SystemUser[]>('zenhr_users', [
