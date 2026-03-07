@@ -137,6 +137,16 @@ setEmployees(firebaseEmployees as Employee[]);
 
 }, []);
   const [attendanceRecords, setAttendanceRecords] = useLocalStorage<AttendanceRecord[]>('zenhr_attendance', []);
+  useEffect(() => {
+
+  const loadAttendance = async () => {
+    const data = await getData("attendance");
+    setAttendanceRecords(data as AttendanceRecord[]);
+  };
+
+  loadAttendance();
+
+}, []);
   const [expenses] = useLocalStorage<Expense[]>('zenhr_expenses', []); 
   const [claims, setClaims] = useLocalStorage<ExpenseClaim[]>('zenhr_claims', INITIAL_CLAIMS || []);
   const [leaveRequests, setLeaveRequests] = useLocalStorage<LeaveRequest[]>('zenhr_leaves', INITIAL_LEAVES || []);
