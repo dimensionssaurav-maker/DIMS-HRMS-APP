@@ -85,10 +85,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Persistent Data States
-  const [employees, setEmployees] = useState<Employee[]>(
-  'zenhr_employees',
-  INITIAL_EMPLOYEES || []
-);
+  const [employees, setEmployees] = useState<Employee[]>([])
 
 useEffect(() => {
 
@@ -109,7 +106,7 @@ setEmployees(
   loadEmployees();
 
 }, []);
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>('zenhr_attendance', []);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
   useEffect(() => {
 
   const loadAttendance = async () => {
@@ -166,12 +163,12 @@ setClaims(Array.isArray(data) ? data : []);
   loadAttendance();
 
 }, []);
-  const [expenses] = useState<Expense[]>('zenhr_expenses', []); 
-  const [claims, setClaims] = useState<ExpenseClaim[]>('zenhr_claims', INITIAL_CLAIMS || []);
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>('zenhr_leaves', INITIAL_LEAVES || []);
-  const [shifts, setShifts] = useState<Shift[]>('zenhr_shifts', INITIAL_SHIFTS || []);
-  const [loans, setLoans] = useState<Loan[]>('zenhr_loans', INITIAL_LOANS || []);
-  const [departments, setDepartments] = useState<string[]>('zenhr_departments', INITIAL_DEPARTMENTS || []);
+  const [expenses] = useState<Expense[]>([])
+  const [claims, setClaims] = useState<ExpenseClaim[]>([])
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
+  const [shifts, setShifts] = useState<Shift[]>([])
+  const [loans, setLoans] = useState<Loan[]>([])
+  const [departments, setDepartments] = useState<string[]>([])
   const [holidays, setHolidays] = useState<Holiday[]>('zenhr_holidays', []);
   // LOAD EMPLOYEES
 useEffect(() => {
