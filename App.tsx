@@ -1,484 +1,274 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from "react";
+import { addData, getData } from "./services/firebaseService";
 
-import { addData, getData } from "./services/firebaseService"
+import Layout from "./components/Layout.tsx";
+import Dashboard from "./components/Dashboard.tsx";
+import EmployeeManagement from "./components/EmployeeManagement.tsx";
+import AttendanceTracker from "./components/AttendanceTracker.tsx";
+import LeaveManagement from "./components/LeaveManagement.tsx";
+import ShiftManagement from "./components/ShiftManagement.tsx";
+import PayrollCalculator from "./components/PayrollCalculator.tsx";
+import ExpenseTracker from "./components/ExpenseTracker.tsx";
+import OvertimeModule from "./components/OvertimeModule.tsx";
+import LoanManagement from "./components/LoanManagement.tsx";
+import SettingsModule from "./components/SettingsModule.tsx";
+import EmployeeOnboarding from "./components/EmployeeOnboarding.tsx";
+import AIChatBot from "./components/AIChatBot.tsx";
 
-import Layout from './components/Layout.tsx';
-import Dashboard from './components/Dashboard.tsx';
-import EmployeeManagement from './components/EmployeeManagement.tsx';
-import AttendanceTracker from './components/AttendanceTracker.tsx';
-import LeaveManagement from './components/LeaveManagement.tsx';
-import ShiftManagement from './components/ShiftManagement.tsx';
-import PayrollCalculator from './components/PayrollCalculator.tsx';
-import ExpenseTracker from './components/ExpenseTracker.tsx';
-import OvertimeModule from './components/OvertimeModule.tsx';
-import LoanManagement from './components/LoanManagement.tsx';
-import SettingsModule from './components/SettingsModule.tsx';
-import EmployeeOnboarding from './components/EmployeeOnboarding.tsx';
-import AIChatBot from './components/AIChatBot.tsx';
+import {
+  Employee,
+  AttendanceRecord,
+  ExpenseClaim,
+  LeaveRequest,
+  Shift,
+  Loan,
+  PayrollConfig,
+  Holiday,
+  SystemUser,
+} from "./types.ts";
 
-// Report Components
-import ESICReportSection from './components/ESICReportSection.tsx';
-import LWFReportSection from './components/LWFReportSection.tsx';
-import ExpenseReportSection from './components/ExpenseReportSection.tsx';
-import YearlyExpenseReportSection from './components/YearlyExpenseReportSection.tsx';
-import LoanRecoveryReportSection from './components/LoanRecoveryReportSection.tsx';
-import LateReportSection from './components/LateReportSection.tsx';
-import LeftEmployeesReportSection from './components/LeftEmployeesReportSection.tsx';
-
-import { 
-  Employee, AttendanceRecord, Expense, ExpenseClaim, LeaveRequest, 
-  Shift, Loan, PayrollConfig, Holiday, ExpenseCategory, SystemUser 
-} from './types.ts';
-import { calculateMonthlyPayroll } from './utils/calculations.ts';
-
-const ReportsModule = ({ 
-  employees, payroll, expenses, loans, attendance, shifts 
-}: { 
-  employees: Employee[], payroll: any[], expenses: Expense[], loans: Loan[], attendance: AttendanceRecord[], shifts: Shift[] 
-}) => {
-  const [reportType, setReportType] = useState('esic');
-  const [year] = useState(new Date().getFullYear());
-  const [month] = useState(new Date().toLocaleString('default', { month: 'long' }));
-  
-  return (
-    <div className="space-y-6 animate-in fade-in">
-       <div className="flex gap-2 overflow-x-auto pb-2 border-b border-slate-100">
-          {[
-            { id: 'esic', label: 'ESIC Register' },
-            { id: 'lwf', label: 'LWF Report' },
-            { id: 'expense', label: 'Expense Analysis' },
-            { id: 'loans', label: 'Loan Recovery' },
-            { id: 'late', label: 'Late Arrivals' },
-            { id: 'leavers', label: 'Ex-Employees' }
-          ].map(type => (
-             <button 
-               key={type.id}
-               onClick={() => setReportType(type.id)}
-               className={`px-4 py-2 rounded-xl text-sm font-bold uppercase whitespace-nowrap transition-all ${reportType === type.id ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-200'}`}
-             >
-               {type.label}
-             </button>
-          ))}
-       </div>
-
-       {reportType === 'esic' && <ESICReportSection payroll={payroll} employees={employees} year={year} month={month} departmentFilter="All Departments" />}
-       {reportType === 'lwf' && <LWFReportSection payroll={payroll} employees={employees} year={year} month={month} departmentFilter="All Departments" />}
-       {reportType === 'expense' && (
-          <div className="space-y-6">
-            <ExpenseReportSection expenses={expenses} month={month} year={year} />
-            <YearlyExpenseReportSection expenses={expenses} year={year} />
-          </div>
-       )}
-       {reportType === 'loans' && <LoanRecoveryReportSection loans={loans} employees={employees} />}
-       {reportType === 'late' && <LateReportSection employees={employees} attendance={attendance} shifts={shifts} startDate={`${year}-01-01`} endDate={`${year}-12-31`} />}
-       {reportType === 'leavers' && <LeftEmployeesReportSection employees={employees} />}
-    </div>
-  );
-};
+import { calculateMonthlyPayroll } from "./utils/calculations.ts";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  // Persistent Data States
-  const [employees, setEmployees] = useState<Employee[]>(
-  INITIAL_EMPLOYEES || []
-);
-
-useEffect(() => {
-
-  const loadEmployees = async () => {
-    try {
-
-      const firebaseEmployees = await getData("employees");
-
-setEmployees(
-  Array.isArray(firebaseEmployees) ? firebaseEmployees : []
-);
-
-          } catch (error) {
-      console.error("Error loading employees:", error);
-    }
-  };
-
-  loadEmployees();
-
-}, []);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
-  useEffect(() => {
+  const [claims, setClaims] = useState<ExpenseClaim[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [users, setUsers] = useState<SystemUser[]>([]);
 
-  const loadAttendance = async () => {
-    const data = await getData("attendance");
-setAttendanceRecords(Array.isArray(data) ? data : []);
-  };
-// LOAD LEAVES FROM FIREBASE
-useEffect(() => {
-
-  const loadLeaves = async () => {
-    const data = await getData("leaves");
-setLeaveRequests(Array.isArray(data) ? data : []);
-  };
-
-  loadLeaves();
-
-}, []);
-
-// LOAD SHIFTS FROM FIREBASE
-useEffect(() => {
-
-  const loadShifts = async () => {
-    const data = await getData("shifts");
-setShifts(Array.isArray(data) ? data : []);
-  };
-
-  loadShifts();
-
-}, []);
-
-// LOAD LOANS FROM FIREBASE
-useEffect(() => {
-
-  const loadLoans = async () => {
-    const data = await getData("loans");
-setLoans(Array.isArray(data) ? data : []);
-  };
-
-  loadLoans();
-
-}, []);
-
-// LOAD CLAIMS FROM FIREBASE
-useEffect(() => {
-
-  const loadClaims = async () => {
-    const data = await getData("claims");
-setClaims(Array.isArray(data) ? data : []);
-  };
-
-  loadClaims();
-
-}, []);
-  loadAttendance();
-
-}, []);
-  const [expenses] = useState<Expense[]>('zenhr_expenses', []); 
-  const [claims, setClaims] = useState<ExpenseClaim[]>(INITIAL_CLAIMS || []);
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(INITIAL_LEAVES || []);
-  const [shifts, setShifts] = useState<Shift[]>(INITIAL_SHIFTS || []);
-  const [loans, setLoans] = useState<Loan[]>(INITIAL_LOANS || []);
-  const [departments, setDepartments] = useState<string[]>(INITIAL_DEPARTMENTS || []);
-  const [holidays, setHolidays] = useState<Holiday[]>('zenhr_holidays', []);
-  // LOAD EMPLOYEES
-useEffect(() => {
-  const loadEmployees = async () => {
-    try {
-      const data = await getData("employees");
-setEmployees(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Error loading employees:", error);
-    }
-  };
-  loadEmployees();
-}, []);
-
-
-// LOAD ATTENDANCE
-useEffect(() => {
-  const loadAttendance = async () => {
-    try {
-      const data = await getData("attendance");
-      setAttendanceRecords(data as AttendanceRecord[]);
-    } catch (error) {
-      console.error("Error loading attendance:", error);
-    }
-  };
-  loadAttendance();
-}, []);
-
-
-// LOAD LEAVES
-useEffect(() => {
-  const loadLeaves = async () => {
-    try {
-      const data = await getData("leaves");
-      setLeaveRequests(data as LeaveRequest[]);
-    } catch (error) {
-      console.error("Error loading leaves:", error);
-    }
-  };
-  loadLeaves();
-}, []);
-
-
-// LOAD SHIFTS
-useEffect(() => {
-  const loadShifts = async () => {
-    try {
-      const data = await getData("shifts");
-      setShifts(data as Shift[]);
-    } catch (error) {
-      console.error("Error loading shifts:", error);
-    }
-  };
-  loadShifts();
-}, []);
-
-
-// LOAD LOANS
-useEffect(() => {
-  const loadLoans = async () => {
-    try {
-      const data = await getData("loans");
-      setLoans(data as Loan[]);
-    } catch (error) {
-      console.error("Error loading loans:", error);
-    }
-  };
-  loadLoans();
-}, []);
-
-
-// LOAD CLAIMS
-useEffect(() => {
-  const loadClaims = async () => {
-    try {
-      const data = await getData("claims");
-      setClaims(data as ExpenseClaim[]);
-    } catch (error) {
-      console.error("Error loading claims:", error);
-    }
-  };
-  loadClaims();
-}, []);
-  
-  // Persistent System Users
-  const [users, setUsers] = useState<SystemUser[]>([
-    { id: 'u1', name: 'Admin User', email: 'admin@zenhr.com', role: 'Admin', status: 'Active', lastLogin: '2024-10-25 09:00 AM', isLocked: true }
-  ]);
-
-  // Persistent Config
   const [payrollConfig, setPayrollConfig] = useState<PayrollConfig>({
     globalOtMultiplier: 1.5,
     designationOverrides: {},
     foodingConfig: { enabled: true, minHours: 4, amount: 50, departmentOverrides: {} },
     attendanceConfig: { lateRules: [], earlyExitRules: [] },
     otConfig: { enabled: false, rules: [] },
-    recruitmentConfig: { sources: ['LinkedIn', 'Referral', 'Agency'], serviceChargeRates: [0.0833, 0.10] }
+    recruitmentConfig: { sources: [], serviceChargeRates: [] }
   });
 
-  // Dashboard & Filter States
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('default', { month: 'long' }));
+  const [selectedMonth, setSelectedMonth] = useState(
+    new Date().toLocaleString("default", { month: "long" })
+  );
+
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [otStartDate, setOtStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
-  const [otEndDate, setOtEndDate] = useState(new Date().toISOString().split('T')[0]);
-  
+
   const [cachedInsights, setCachedInsights] = useState("");
 
-  // Derived Payroll Data
+  const [otStartDate, setOtStartDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+
+  const [otEndDate, setOtEndDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+
+  // 🔥 LOAD ALL DATA FROM FIREBASE
+  useEffect(() => {
+
+    const loadAllData = async () => {
+
+      try {
+
+        const emp = await getData("employees");
+        setEmployees(Array.isArray(emp) ? emp : []);
+
+        const att = await getData("attendance");
+        setAttendanceRecords(Array.isArray(att) ? att : []);
+
+        const lev = await getData("leaves");
+        setLeaveRequests(Array.isArray(lev) ? lev : []);
+
+        const sh = await getData("shifts");
+        setShifts(Array.isArray(sh) ? sh : []);
+
+        const ln = await getData("loans");
+        setLoans(Array.isArray(ln) ? ln : []);
+
+        const cl = await getData("claims");
+        setClaims(Array.isArray(cl) ? cl : []);
+
+      } catch (err) {
+
+        console.error("Firebase load error:", err);
+
+      }
+
+    };
+
+    loadAllData();
+
+  }, []);
+
+  // Payroll calculation
   const payrollData = useMemo(() => {
-    return employees.map(emp => 
-        calculateMonthlyPayroll(emp, attendanceRecords, loans, claims, holidays, selectedMonth, selectedYear, payrollConfig)
+
+    return employees.map(emp =>
+      calculateMonthlyPayroll(
+        emp,
+        attendanceRecords,
+        loans,
+        claims,
+        holidays,
+        selectedMonth,
+        selectedYear,
+        payrollConfig
+      )
     );
-  }, [employees, attendanceRecords, loans, claims, holidays, selectedMonth, selectedYear, payrollConfig]);
 
-  // Merged Expenses for Reports
-  const allExpenses = useMemo(() => {
-      const claimExpenses = claims
-        .filter(c => c.status === 'Approved' || c.status === 'Reimbursed')
-        .map(c => ({
-            id: c.id,
-            amount: c.amount,
-            category: ExpenseCategory.MISC, 
-            date: c.date,
-            description: c.title
-        } as Expense));
-      return [...expenses, ...claimExpenses];
-  }, [expenses, claims]);
-
-  // Context for AI
-  const appContext = {
+  }, [
     employees,
-    attendanceSummary: attendanceRecords.length,
-    payrollTotal: payrollData.reduce((sum, p) => sum + p.netPayable, 0),
-    pendingClaims: claims.filter(c => c.status === 'Under Review').length
-  };
+    attendanceRecords,
+    loans,
+    claims,
+    holidays,
+    selectedMonth,
+    selectedYear,
+    payrollConfig
+  ]);
 
+  // Add Employee
   const handleAddEmployee = async (emp: Employee) => {
-  try {
+
     await addData("employees", emp);
 
     setEmployees([...employees, emp]);
+
     setShowOnboarding(false);
 
-    console.log("Employee saved to Firebase");
-  } catch (error) {
-    console.error("Error saving employee:", error);
-  }
-};
+  };
 
   const renderContent = () => {
+
     switch (activeTab) {
-      case 'dashboard':
+
+      case "dashboard":
         return (
-          <Dashboard 
-            data={{ 
-              employees, 
-              attendance: attendanceRecords, 
-              payroll: payrollData, 
-              expenses: allExpenses 
+          <Dashboard
+            data={{
+              employees,
+              attendance: attendanceRecords,
+              payroll: payrollData,
+              expenses: []
             }}
             selectedMonth={selectedMonth}
             setSelectedMonth={setSelectedMonth}
             selectedYear={selectedYear}
             setSelectedYear={setSelectedYear}
-            months={["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]}
-            years={[2023, 2024, 2025]}
             cachedInsights={cachedInsights}
             setCachedInsights={setCachedInsights}
           />
         );
-      case 'employees':
+
+      case "employees":
         return showOnboarding ? (
-            <EmployeeOnboarding 
-              onComplete={handleAddEmployee} 
-              onCancel={() => setShowOnboarding(false)} 
-              departments={departments}
-            />
-          ) : (
-            <EmployeeManagement 
-              employees={employees}
-              departments={departments}
-              shifts={shifts}
-              payrollConfig={payrollConfig}
-              onAdd={() => setShowOnboarding(true)}
-              onBulkAdd={(newEmps) => setEmployees([...employees, ...newEmps])}
-              onDelete={(ids) => setEmployees(employees.filter(e => !ids.includes(e.id)))}
-              onUpdate={(updatedEmps) => {
-                 const updatedIds = updatedEmps.map(e => e.id);
-                 setEmployees(employees.map(e => updatedIds.includes(e.id) ? updatedEmps.find(u => u.id === e.id)! : e));
-              }}
-            />
-          );
-      case 'attendance':
+          <EmployeeOnboarding
+            onComplete={handleAddEmployee}
+            onCancel={() => setShowOnboarding(false)}
+            departments={departments}
+          />
+        ) : (
+          <EmployeeManagement
+            employees={employees}
+            departments={departments}
+            shifts={shifts}
+            payrollConfig={payrollConfig}
+            onAdd={() => setShowOnboarding(true)}
+            onBulkAdd={(e) => setEmployees([...employees, ...e])}
+            onDelete={(ids) =>
+              setEmployees(employees.filter(e => !ids.includes(e.id)))
+            }
+            onUpdate={(updated) =>
+              setEmployees(
+                employees.map(e =>
+                  updated.find(u => u.id === e.id) || e
+                )
+              )
+            }
+          />
+        );
+
+      case "attendance":
         return (
-          <AttendanceTracker 
-            employees={employees.filter(e => e.status === 'Active')}
+          <AttendanceTracker
+            employees={employees.filter(e => e.status === "Active")}
             shifts={shifts}
             records={attendanceRecords}
             holidays={holidays}
             payrollConfig={payrollConfig}
             onUpdate={async (record) => {
 
-  await addData("attendance", record)
+              await addData("attendance", record);
 
-  const existingIdx = attendanceRecords.findIndex(r => r.employeeId === record.employeeId && r.date === record.date)
+              setAttendanceRecords([...attendanceRecords, record]);
 
-  if (existingIdx >= 0) {
-    const newRecords = [...attendanceRecords]
-    newRecords[existingIdx] = record
-    setAttendanceRecords(newRecords)
-  } else {
-    setAttendanceRecords([...attendanceRecords, record])
-  }
+            }}
+            onBulkUpdate={async (records) => {
 
-}}
-            onBulkUpdate={async (newRecords) => {
+              for (const r of records) {
+                await addData("attendance", r);
+              }
 
-  for (const r of newRecords) {
-    await addData("attendance", r)
-  }
+              setAttendanceRecords([...attendanceRecords, ...records]);
 
-  const newRecordKeys = new Set(newRecords.map(r => `${r.employeeId}-${r.date}`))
-  const filteredOld = attendanceRecords.filter(r => !newRecordKeys.has(`${r.employeeId}-${r.date}`))
-
-  setAttendanceRecords([...filteredOld, ...newRecords])
-
-}}
+            }}
           />
         );
-      case 'leaves':
+
+      case "leaves":
         return (
-          <LeaveManagement 
+          <LeaveManagement
             employees={employees}
             leaveRequests={leaveRequests}
             holidays={holidays}
-            onAddRequest={(req) => setLeaveRequests([...leaveRequests, req])}
-            onUpdateRequest={(req) => setLeaveRequests(leaveRequests.map(r => r.id === req.id ? req : r))}
+            onAddRequest={(r) => setLeaveRequests([...leaveRequests, r])}
+            onUpdateRequest={(r) =>
+              setLeaveRequests(
+                leaveRequests.map(l => (l.id === r.id ? r : l))
+              )
+            }
             onUpdateHolidays={setHolidays}
           />
         );
-      case 'shifts':
+
+      case "shifts":
         return (
-          <ShiftManagement 
+          <ShiftManagement
             shifts={shifts}
             onAdd={(s) => setShifts([...shifts, s])}
-            onUpdate={(s) => setShifts(shifts.map(sh => sh.id === s.id ? s : sh))}
-            onDelete={(id) => setShifts(shifts.filter(s => s.id !== id))}
+            onUpdate={(s) =>
+              setShifts(shifts.map(sh => (sh.id === s.id ? s : sh)))
+            }
+            onDelete={(id) =>
+              setShifts(shifts.filter(s => s.id !== id))
+            }
           />
         );
-      case 'payroll':
+
+      case "loans":
         return (
-          <PayrollCalculator 
-            employees={employees}
-            payroll={payrollData}
-            loans={loans}
-            month={selectedMonth}
-            year={selectedYear}
-          />
-        );
-      case 'expenses':
-        return (
-          <ExpenseTracker 
-            claims={claims}
-            employees={employees}
-            departments={departments}
-            onAddClaim={(c) => setClaims([...claims, c])}
-            onUpdateClaim={(c) => setClaims(claims.map(cl => cl.id === c.id ? c : cl))}
-          />
-        );
-      case 'overtime':
-        return (
-          <OvertimeModule 
-             employees={employees.filter(e => e.status === 'Active')}
-             attendanceRecords={attendanceRecords}
-             departments={departments}
-             startDate={otStartDate}
-             endDate={otEndDate}
-             onDateChange={(s, e) => { setOtStartDate(s); setOtEndDate(e); }}
-             payrollConfig={payrollConfig}
-          />
-        );
-      case 'loans':
-        return (
-          <LoanManagement 
+          <LoanManagement
             loans={loans}
             employees={employees}
             onAdd={(l) => setLoans([...loans, l])}
-            onUpdate={(l) => setLoans(loans.map(loan => loan.id === l.id ? l : loan))}
-            onDelete={(id) => setLoans(loans.filter(l => l.id !== id))}
+            onUpdate={(l) =>
+              setLoans(loans.map(lo => (lo.id === l.id ? l : lo)))
+            }
+            onDelete={(id) =>
+              setLoans(loans.filter(l => l.id !== id))
+            }
           />
         );
-      case 'statutory':
+
+      case "settings":
         return (
-           <div className="space-y-8">
-              <ESICReportSection payroll={payrollData} employees={employees} year={selectedYear} month={selectedMonth} departmentFilter="All Departments" />
-              <LWFReportSection payroll={payrollData} employees={employees} year={selectedYear} month={selectedMonth} departmentFilter="All Departments" />
-           </div>
-        );
-      case 'reports':
-        return (
-          <ReportsModule 
-            employees={employees}
-            payroll={payrollData}
-            expenses={allExpenses}
-            loans={loans}
-            attendance={attendanceRecords}
-            shifts={shifts}
-          />
-        );
-      case 'settings':
-        return (
-          <SettingsModule 
+          <SettingsModule
             payrollConfig={payrollConfig}
             onUpdatePayrollConfig={setPayrollConfig}
             employees={employees}
@@ -488,17 +278,18 @@ useEffect(() => {
             onUpdateUsers={setUsers}
           />
         );
+
       default:
         return null;
     }
+
   };
 
   return (
     <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
-      <div className="animate-in fade-in duration-500">
-        {renderContent()}
-      </div>
-      <AIChatBot appContext={appContext} />
+      {renderContent()}
+      <AIChatBot appContext={{ employees }} />
     </Layout>
   );
+
 }
