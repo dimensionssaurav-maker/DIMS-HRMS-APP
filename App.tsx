@@ -32,7 +32,7 @@ import {
 import { 
   INITIAL_EMPLOYEES, INITIAL_SHIFTS, INITIAL_CLAIMS, 
   INITIAL_LEAVES, INITIAL_LOANS, INITIAL_DEPARTMENTS 
-} from './constants';
+} from './ants';
 import { calculateMonthlyPayroll } from './utils/calculations.ts';
 
 const ReportsModule = ({ 
@@ -86,7 +86,6 @@ export default function App() {
 
   // Persistent Data States
   const [employees, setEmployees] = useState<Employee[]>(
-  'zenhr_employees',
   INITIAL_EMPLOYEES || []
 );
 
@@ -109,7 +108,7 @@ setEmployees(
   loadEmployees();
 
 }, []);
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>('zenhr_attendance', []);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   useEffect(() => {
 
   const loadAttendance = async () => {
@@ -167,11 +166,11 @@ setClaims(Array.isArray(data) ? data : []);
 
 }, []);
   const [expenses] = useState<Expense[]>('zenhr_expenses', []); 
-  const [claims, setClaims] = useState<ExpenseClaim[]>('zenhr_claims', INITIAL_CLAIMS || []);
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>('zenhr_leaves', INITIAL_LEAVES || []);
-  const [shifts, setShifts] = useState<Shift[]>('zenhr_shifts', INITIAL_SHIFTS || []);
-  const [loans, setLoans] = useState<Loan[]>('zenhr_loans', INITIAL_LOANS || []);
-  const [departments, setDepartments] = useState<string[]>('zenhr_departments', INITIAL_DEPARTMENTS || []);
+  const [claims, setClaims] = useState<ExpenseClaim[]>(INITIAL_CLAIMS || []);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(INITIAL_LEAVES || []);
+  const [shifts, setShifts] = useState<Shift[]>(INITIAL_SHIFTS || []);
+  const [loans, setLoans] = useState<Loan[]>(INITIAL_LOANS || []);
+  const [departments, setDepartments] = useState<string[]>(INITIAL_DEPARTMENTS || []);
   const [holidays, setHolidays] = useState<Holiday[]>('zenhr_holidays', []);
   // LOAD EMPLOYEES
 useEffect(() => {
@@ -257,12 +256,12 @@ useEffect(() => {
 }, []);
   
   // Persistent System Users
-  const [users, setUsers] = useState<SystemUser[]>('zenhr_users', [
+  const [users, setUsers] = useState<SystemUser[]>([
     { id: 'u1', name: 'Admin User', email: 'admin@zenhr.com', role: 'Admin', status: 'Active', lastLogin: '2024-10-25 09:00 AM', isLocked: true }
   ]);
 
   // Persistent Config
-  const [payrollConfig, setPayrollConfig] = useState<PayrollConfig>('zenhr_payroll_config', {
+  const [payrollConfig, setPayrollConfig] = useState<PayrollConfig>({
     globalOtMultiplier: 1.5,
     designationOverrides: {},
     foodingConfig: { enabled: true, minHours: 4, amount: 50, departmentOverrides: {} },
