@@ -1,19 +1,19 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { addData, getData } from "./services/firebaseService";
 
-import Layout from "./components/Layout.tsx";
-import Dashboard from "./components/Dashboard.tsx";
-import EmployeeManagement from "./components/EmployeeManagement.tsx";
-import AttendanceTracker from "./components/AttendanceTracker.tsx";
-import LeaveManagement from "./components/LeaveManagement.tsx";
-import ShiftManagement from "./components/ShiftManagement.tsx";
-import PayrollCalculator from "./components/PayrollCalculator.tsx";
-import ExpenseTracker from "./components/ExpenseTracker.tsx";
-import OvertimeModule from "./components/OvertimeModule.tsx";
-import LoanManagement from "./components/LoanManagement.tsx";
-import SettingsModule from "./components/SettingsModule.tsx";
-import EmployeeOnboarding from "./components/EmployeeOnboarding.tsx";
-import AIChatBot from "./components/AIChatBot.tsx";
+import Layout from "./components/Layout";
+import Dashboard from "./components/Dashboard";
+import EmployeeManagement from "./components/EmployeeManagement";
+import AttendanceTracker from "./components/AttendanceTracker";
+import LeaveManagement from "./components/LeaveManagement";
+import ShiftManagement from "./components/ShiftManagement";
+import PayrollCalculator from "./components/PayrollCalculator";
+import ExpenseTracker from "./components/ExpenseTracker";
+import OvertimeModule from "./components/OvertimeModule";
+import LoanManagement from "./components/LoanManagement";
+import SettingsModule from "./components/SettingsModule";
+import EmployeeOnboarding from "./components/EmployeeOnboarding";
+import AIChatBot from "./components/AIChatBot";
 
 import {
   Employee,
@@ -24,10 +24,10 @@ import {
   Loan,
   PayrollConfig,
   Holiday,
-  SystemUser,
-} from "./types.ts";
+  SystemUser
+} from "./types";
 
-import { calculateMonthlyPayroll } from "./utils/calculations.ts";
+import { calculateMonthlyPayroll } from "./utils/calculations";
 
 export default function App() {
 
@@ -44,6 +44,12 @@ export default function App() {
   const [departments, setDepartments] = useState<string[]>([]);
   const [users, setUsers] = useState<SystemUser[]>([]);
 
+  const [selectedMonth, setSelectedMonth] = useState(
+    new Date().toLocaleString("default", { month: "long" })
+  );
+
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
   const [payrollConfig, setPayrollConfig] = useState<PayrollConfig>({
     globalOtMultiplier: 1.5,
     designationOverrides: {},
@@ -52,12 +58,6 @@ export default function App() {
     otConfig: { enabled: false, rules: [] },
     recruitmentConfig: { sources: [], serviceChargeRates: [] }
   });
-
-  const [selectedMonth, setSelectedMonth] = useState(
-    new Date().toLocaleString("default", { month: "long" })
-  );
-
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const [cachedInsights, setCachedInsights] = useState("");
 
@@ -69,10 +69,13 @@ export default function App() {
     new Date().toISOString().split("T")[0]
   );
 
-  // 🔥 LOAD ALL DATA FROM FIREBASE
+  /* ===============================
+     LOAD ALL FIREBASE DATA
+  =============================== */
+
   useEffect(() => {
 
-    const loadAllData = async () => {
+    const loadData = async () => {
 
       try {
 
@@ -96,26 +99,31 @@ export default function App() {
 
       } catch (err) {
 
-        console.error("Firebase load error:", err);
+        console.error("Firebase loading error:", err);
 
       }
 
     };
 
-    loadAllData();
+    loadData();
 
   }, []);
 
-  // Payroll calculation
+  /* ===============================
+     PAYROLL CALCULATION
+  =============================== */
+
   const payrollData = useMemo(() => {
 
-    return employees.map(emp =>
+    const safeEmployees = Array.isArray(employees) ? employees : [];
+
+    return safeEmployees.map(emp =>
       calculateMonthlyPayroll(
         emp,
-        attendanceRecords,
-        loans,
-        claims,
-        holidays,
+        attendanceRecords || [],
+        loans || [],
+        claims || [],
+        holidays || [],
         selectedMonth,
         selectedYear,
         payrollConfig
@@ -133,16 +141,31 @@ export default function App() {
     payrollConfig
   ]);
 
-  // Add Employee
+  /* ===============================
+     ADD EMPLOYEE
+  =============================== */
+
   const handleAddEmployee = async (emp: Employee) => {
 
-    await addData("employees", emp);
+    try {
 
-    setEmployees([...employees, emp]);
+      await addData("employees", emp);
 
-    setShowOnboarding(false);
+      setEmployees(prev => [...prev, emp]);
+
+      setShowOnboarding(false);
+
+    } catch (err) {
+
+      console.error("Employee save error:", err);
+
+    }
 
   };
+
+  /* ===============================
+     RENDER MODULE
+  =============================== */
 
   const renderContent = () => {
 
@@ -180,15 +203,13 @@ export default function App() {
             shifts={shifts}
             payrollConfig={payrollConfig}
             onAdd={() => setShowOnboarding(true)}
-            onBulkAdd={(e) => setEmployees([...employees, ...e])}
+            onBulkAdd={(list) => setEmployees(prev => [...prev, ...list])}
             onDelete={(ids) =>
-              setEmployees(employees.filter(e => !ids.includes(e.id)))
+              setEmployees(prev => prev.filter(e => !ids.includes(e.id)))
             }
             onUpdate={(updated) =>
-              setEmployees(
-                employees.map(e =>
-                  updated.find(u => u.id === e.id) || e
-                )
+              setEmployees(prev =>
+                prev.map(e => updated.find(u => u.id === e.id) || e)
               )
             }
           />
@@ -197,16 +218,16 @@ export default function App() {
       case "attendance":
         return (
           <AttendanceTracker
-            employees={employees.filter(e => e.status === "Active")}
-            shifts={shifts}
-            records={attendanceRecords}
-            holidays={holidays}
+            employees={(employees || []).filter(e => e?.status === "Active")}
+            shifts={shifts || []}
+            records={attendanceRecords || []}
+            holidays={holidays || []}
             payrollConfig={payrollConfig}
             onUpdate={async (record) => {
 
               await addData("attendance", record);
 
-              setAttendanceRecords([...attendanceRecords, record]);
+              setAttendanceRecords(prev => [...prev, record]);
 
             }}
             onBulkUpdate={async (records) => {
@@ -215,7 +236,7 @@ export default function App() {
                 await addData("attendance", r);
               }
 
-              setAttendanceRecords([...attendanceRecords, ...records]);
+              setAttendanceRecords(prev => [...prev, ...records]);
 
             }}
           />
@@ -227,10 +248,10 @@ export default function App() {
             employees={employees}
             leaveRequests={leaveRequests}
             holidays={holidays}
-            onAddRequest={(r) => setLeaveRequests([...leaveRequests, r])}
-            onUpdateRequest={(r) =>
-              setLeaveRequests(
-                leaveRequests.map(l => (l.id === r.id ? r : l))
+            onAddRequest={(req) => setLeaveRequests(prev => [...prev, req])}
+            onUpdateRequest={(req) =>
+              setLeaveRequests(prev =>
+                prev.map(r => (r.id === req.id ? req : r))
               )
             }
             onUpdateHolidays={setHolidays}
@@ -241,12 +262,12 @@ export default function App() {
         return (
           <ShiftManagement
             shifts={shifts}
-            onAdd={(s) => setShifts([...shifts, s])}
+            onAdd={(s) => setShifts(prev => [...prev, s])}
             onUpdate={(s) =>
-              setShifts(shifts.map(sh => (sh.id === s.id ? s : sh)))
+              setShifts(prev => prev.map(sh => (sh.id === s.id ? s : sh)))
             }
             onDelete={(id) =>
-              setShifts(shifts.filter(s => s.id !== id))
+              setShifts(prev => prev.filter(s => s.id !== id))
             }
           />
         );
@@ -256,12 +277,12 @@ export default function App() {
           <LoanManagement
             loans={loans}
             employees={employees}
-            onAdd={(l) => setLoans([...loans, l])}
+            onAdd={(l) => setLoans(prev => [...prev, l])}
             onUpdate={(l) =>
-              setLoans(loans.map(lo => (lo.id === l.id ? l : lo)))
+              setLoans(prev => prev.map(lo => (lo.id === l.id ? l : lo)))
             }
             onDelete={(id) =>
-              setLoans(loans.filter(l => l.id !== id))
+              setLoans(prev => prev.filter(l => l.id !== id))
             }
           />
         );
@@ -281,6 +302,7 @@ export default function App() {
 
       default:
         return null;
+
     }
 
   };
