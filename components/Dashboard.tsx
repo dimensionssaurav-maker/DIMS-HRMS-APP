@@ -184,9 +184,10 @@ const Dashboard: React.FC<Props> = ({
             </div>
           </div>
           <div className="h-[300px] w-full">
-            {dailyAttendanceData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dailyAttendanceData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            {attendanceTrend && attendanceTrend.length > 0 ? (
+
+<ResponsiveContainer width="100%" height={300}>
+  <BarChart data={attendanceTrend}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis 
                     dataKey="name" 
