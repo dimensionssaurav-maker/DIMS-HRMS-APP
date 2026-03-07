@@ -29,10 +29,6 @@ import {
   Employee, AttendanceRecord, Expense, ExpenseClaim, LeaveRequest, 
   Shift, Loan, PayrollConfig, Holiday, ExpenseCategory, SystemUser 
 } from './types.ts';
-import { 
-  INITIAL_EMPLOYEES, INITIAL_SHIFTS, INITIAL_CLAIMS, 
-  INITIAL_LEAVES, INITIAL_LOANS, INITIAL_DEPARTMENTS 
-} from './ants';
 import { calculateMonthlyPayroll } from './utils/calculations.ts';
 
 const ReportsModule = ({ 
