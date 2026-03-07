@@ -96,7 +96,10 @@ useEffect(() => {
     try {
 
       const firebaseEmployees = await getData("employees");
-setEmployees(firebaseEmployees as Employee[]);
+
+setEmployees(
+  Array.isArray(firebaseEmployees) ? firebaseEmployees : []
+);
 
           } catch (error) {
       console.error("Error loading employees:", error);
