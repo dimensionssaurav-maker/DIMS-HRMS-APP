@@ -184,7 +184,7 @@ const Dashboard: React.FC<Props> = ({
             </div>
           </div>
           <div className="h-[300px] w-full">
-            {dailyAttendanceData && dailyAttendanceData.length > 0 ? (
+            {Array.isArray(dailyAttendanceData) && dailyAttendanceData.length > 0 ? (
 
 <ResponsiveContainer width="100%" height={300}>
   <BarChart data={dailyAttendanceData}>
