@@ -96,8 +96,8 @@ export function calculateMonthlyPayroll(
   }
 
   const totalPaidHolidays = manualHolidays + autoHolidays;
-  const totalOvertimeHours = empAttendance.reduce((acc, curr) => acc + curr.overtimeHours, 0);
-  const totalLateMinutes = empAttendance.reduce((acc, curr) => acc + (curr.lateMinutes || 0), 0);
+  const totalOvertimeHours = empAttendance.reduce((acc, curr) => acc + (Number(curr.overtimeHours) || 0), 0);
+  const totalLateMinutes = empAttendance.reduce((acc, curr) => acc + (Number(curr.lateMinutes) || 0), 0);
 
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
 
