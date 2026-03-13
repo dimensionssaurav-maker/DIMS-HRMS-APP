@@ -61,15 +61,39 @@ export function calculateMonthlyPayroll(
   const monthIndex = new Date(`${month} 1, 2000`).getMonth();
 
   let autoHolidays = 0;
+
+  // Count Full-day global holidays where no manual HOLIDAY record exists yet
   holidays.forEach(h => {
     if (h.type !== 'Full') return;
     const hDate = new Date(h.date);
     if (joinDay && hDate < joinDay) return;
     if (hDate.getMonth() === monthIndex && hDate.getFullYear() === year) {
-      const hasRecord = empAttendance.some(r => r.date === h.date);
-      if (!hasRecord) autoHolidays++;
+      // Only auto-count if employee has no manual HOLIDAY record for this date
+      // (avoids double-counting when user already marked it manually)
+      const hasHolidayRecord = empAttendance.some(
+        r => r.date === h.date && isHolidayStatus(r.status)
+      );
+      if (!hasHolidayRecord) autoHolidays++;
     }
   });
+
+  // Count Sundays as weekly-off holidays (paid)
+  // Only count Sundays where employee has no attendance record at all
+  const daysInMonthForSunday = new Date(year, monthIndex + 1, 0).getDate();
+  for (let d = 1; d <= daysInMonthForSunday; d++) {
+    const dateObj = new Date(year, monthIndex, d);
+    if (dateObj.getDay() !== 0) continue; // not Sunday
+    if (joinDay && dateObj < joinDay) continue; // before joining
+    const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    // Skip if a global holiday already covers this Sunday (avoid double count)
+    const coveredByGlobalHoliday = holidays.some(
+      h => h.date === dateStr && h.type === 'Full'
+    );
+    if (coveredByGlobalHoliday) continue;
+    // Only count as weekly-off if no attendance record exists for this Sunday
+    const hasSundayRecord = empAttendance.some(r => r.date === dateStr);
+    if (!hasSundayRecord) autoHolidays++;
+  }
 
   const totalPaidHolidays = manualHolidays + autoHolidays;
   const totalOvertimeHours = empAttendance.reduce((acc, curr) => acc + curr.overtimeHours, 0);
