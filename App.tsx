@@ -581,7 +581,7 @@ export default function App() {
           <ShiftManagement shifts={shifts} onAdd={handleAddShift} onUpdate={handleUpdateShift} onDelete={handleDeleteShift} />
         );
       case 'payroll':
-        return <PayrollCalculator employees={employees} payroll={payrollData} loans={loans} month={selectedMonth} year={selectedYear} />;
+        return <PayrollCalculator employees={employees} payroll={payrollData} loans={loans} month={selectedMonth} year={selectedYear} onMonthChange={setSelectedMonth} onYearChange={setSelectedYear} />;
       case 'expenses':
         return (
           <ExpenseTracker
