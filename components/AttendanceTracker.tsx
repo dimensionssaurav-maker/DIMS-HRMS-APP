@@ -50,18 +50,33 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
 
   const getEmpMonthlySummary = (empId: string, days: string[]) => {
     let present = 0, absent = 0, leave = 0, holiday = 0, late = 0, totalOT = 0;
+    const emp = employees.find(e => e.id === empId);
+    const joinDay = emp?.joiningDate
+      ? (() => { const d = new Date(emp.joiningDate); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); })()
+      : null;
+
     days.forEach(date => {
       const r = getMonthRecord(empId, date);
-      const isSun = new Date(date).getDay() === 0;
-      const hol = holidays.find(h => h.date === date);
-      if (!r && (isSun || (hol && hol.type === 'Full'))) { holiday++; return; }
-      if (!r) return;
-      if (r.status === 'PRESENT' as AttendanceStatus) present++;
-      else if (r.status === 'ABSENT' as AttendanceStatus) absent++;
-      else if (r.status === 'LEAVE' as AttendanceStatus) leave++;
-      else if (r.status === 'HOLIDAY' as AttendanceStatus) holiday++;
-      if (r.lateMinutes && r.lateMinutes > 0) late++;
-      totalOT += r.overtimeHours || 0;
+      const dateObj = new Date(date);
+      const isSun = dateObj.getDay() === 0;
+      const hol = holidays.find(h => h.date === date && h.type === 'Full');
+      const isBeforeJoining = joinDay ? dateObj < joinDay : false;
+
+      if (isBeforeJoining) return; // Don't count days before joining
+
+      if (r) {
+        // Record exists — use its status
+        if (r.status === 'PRESENT' as AttendanceStatus) present++;
+        else if (r.status === 'ABSENT' as AttendanceStatus) absent++;
+        else if (r.status === 'LEAVE' as AttendanceStatus) leave++;
+        else if (r.status === 'HOLIDAY' as AttendanceStatus) holiday++;
+        if (r.lateMinutes && r.lateMinutes > 0) late++;
+        totalOT += r.overtimeHours || 0;
+      } else {
+        // No record — auto-classify as holiday (Sunday or full global holiday)
+        if (isSun || hol) holiday++;
+        // else: untracked working day — skip (not yet recorded)
+      }
     });
     return { present, absent, leave, holiday, late, totalOT };
   };
