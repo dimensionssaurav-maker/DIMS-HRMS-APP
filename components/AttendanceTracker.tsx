@@ -121,19 +121,28 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
   };
 
   const exportMonthlyCSV = (days: string[]) => {
-    const headers = ['Employee', 'ID', ...days.map(d => d.slice(8)), 'Present', 'Absent', 'Leave', 'Holiday', 'OT Hrs'];
+    const headers = ['Employee', 'ID', ...days.map(d => d.slice(8)), 'Present', 'Absent', 'Leave', 'Holiday', 'HALFDAY', 'OT Hrs', 'DAYS PAID'];
     const rows = employees.map(emp => {
       const summary = getEmpMonthlySummary(emp.id, days);
+      const halfDays = days.filter(date => {
+        const r = getMonthRecord(emp.id, date);
+        if (!r) return false;
+        const v = String(r.status || '').toUpperCase();
+        return v === 'HD' || v === 'HALFDAY' || v === 'HALF' || v === 'P/H' || v === 'H/P';
+      }).length;
+      const daysPaid = summary.present + (halfDays / 2) + summary.holiday;
       const dayCells = days.map(date => {
         const r = getMonthRecord(emp.id, date);
         if (!r) return '-';
+        const v = String(r.status || '').toUpperCase();
+        if (v === 'HD' || v === 'HALFDAY' || v === 'HALF' || v === 'P/H' || v === 'H/P') return 'HD';
         if (r.status === 'PRESENT' as AttendanceStatus) return `P${r.checkIn ? ' ' + r.checkIn : ''}`;
         if (r.status === 'ABSENT' as AttendanceStatus) return 'A';
         if (r.status === 'LEAVE' as AttendanceStatus) return 'L';
         if (r.status === 'HOLIDAY' as AttendanceStatus) return 'H';
         return '-';
       });
-      return [emp.name, emp.employeeCode || emp.id, ...dayCells, summary.present, summary.absent, summary.leave, summary.holiday, summary.totalOT];
+      return [emp.name, emp.employeeCode || emp.id, ...dayCells, summary.present, summary.absent, summary.leave, summary.holiday, halfDays, summary.totalOT, daysPaid];
     });
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
