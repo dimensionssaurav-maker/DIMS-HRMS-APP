@@ -55,6 +55,14 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
       ? (() => { const d = new Date(emp.joiningDate); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); })()
       : null;
 
+    // Track manually marked HOLIDAY records to avoid double-counting (mirrors payroll logic)
+    const manualHolidayDates = new Set(
+      days.filter(date => {
+        const r = getMonthRecord(empId, date);
+        return r && r.status === ('HOLIDAY' as AttendanceStatus);
+      })
+    );
+
     days.forEach(date => {
       const r = getMonthRecord(empId, date);
       const dateObj = new Date(date);
@@ -73,8 +81,10 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
         if (r.lateMinutes && r.lateMinutes > 0) late++;
         totalOT += r.overtimeHours || 0;
       } else {
-        // No record — auto-classify as holiday (Sunday or full global holiday)
-        if (isSun || hol) holiday++;
+        // No record — mirror payroll: only count as holiday if Sunday or unrecorded global holiday
+        const coveredByGlobalHoliday = hol && !manualHolidayDates.has(date);
+        const isSundayOff = isSun && !hol;
+        if (coveredByGlobalHoliday || isSundayOff) holiday++;
         // else: untracked working day — skip (not yet recorded)
       }
     });
@@ -83,15 +93,29 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
 
   const handleCellSave = () => {
     if (!editingCell) return;
+    const emp = employees.find(e => e.id === editingCell.empId);
+
+    let lateMins = 0;
+    let earlyMins = 0;
+    let otHours = 0;
+
+    if (emp) {
+      if (editCellData.checkIn) lateMins = calculateLateMinutes(editCellData.checkIn, emp, editingCell.date);
+      if (editCellData.checkOut) earlyMins = calculateEarlyMinutes(editCellData.checkOut, emp, editingCell.date);
+      if (editCellData.checkIn && editCellData.checkOut) {
+        otHours = calculateOT(editCellData.checkIn, editCellData.checkOut, emp, editingCell.date);
+      }
+    }
+
     onUpdate({
       employeeId: editingCell.empId,
       date: editingCell.date,
       status: editCellData.status,
       checkIn: editCellData.checkIn || '',
       checkOut: editCellData.checkOut || '',
-      overtimeHours: 0,
-      lateMinutes: 0,
-      earlyMinutes: 0,
+      overtimeHours: otHours,
+      lateMinutes: lateMins,
+      earlyMinutes: earlyMins,
     });
     setEditingCell(null);
   };
