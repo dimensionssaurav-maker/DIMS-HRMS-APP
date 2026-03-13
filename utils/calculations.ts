@@ -70,50 +70,43 @@ export function calculateMonthlyPayroll(
   const monthIndex = new Date(`${month} 1, 2000`).getMonth();
   const daysInMonthTotal = new Date(year, monthIndex + 1, 0).getDate();
 
-  // ── CRITICAL: Only count holidays/Sundays up to the last recorded attendance date ──
-  // Counting the full month would include future Sundays not yet reached,
-  // inflating Days Paid. e.g. running payroll on Mar 13 must NOT count Mar 15, 22, 29.
-  // The "last recorded day" is the highest date with any attendance record for this employee.
-  // If no records exist at all, fall back to today or end of month (whichever is earlier).
-  const lastRecordedDate = empAttendance.length > 0
-    ? empAttendance.reduce((latest, r) => r.date > latest ? r.date : latest, empAttendance[0].date)
-    : null;
-
-  // Cutoff = last day with a record (or today capped at month end if no records)
+  // ── Mirror AttendanceTracker.getEmpMonthlySummary EXACTLY ──────────────────
+  // Build the array of days to consider — same as attendance tracker does:
+  // only days UP TO today (or month end if month is complete), never future days.
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
   const monthEndStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(daysInMonthTotal).padStart(2, '0')}`;
-  const cutoffStr = lastRecordedDate ?? (todayStr < monthEndStr ? todayStr : monthEndStr);
+  const cutoffStr = todayStr < monthEndStr ? todayStr : monthEndStr;
   const cutoffDay = parseInt(cutoffStr.split('-')[2], 10);
 
-  let autoHolidays = 0;
-
-  // Count Full-day global holidays up to cutoff date only
-  holidays.forEach(h => {
-    if (h.type !== 'Full') return;
-    const hDate = new Date(h.date);
-    if (joinDay && hDate < joinDay) return;
-    if (hDate.getMonth() === monthIndex && hDate.getFullYear() === year) {
-      // Only up to our cutoff day
-      if (parseInt(h.date.split('-')[2], 10) > cutoffDay) return;
-      const hasHolidayRecord = empAttendance.some(
-        r => r.date === h.date && isHolidayStatus(r.status)
-      );
-      if (!hasHolidayRecord) autoHolidays++;
-    }
-  });
-
-  // Count Sundays as weekly-off holidays — ONLY up to cutoff date, never future Sundays
+  // Build the days array exactly as AttendanceTracker does (only days up to cutoff)
+  const monthDaysToCount: string[] = [];
   for (let d = 1; d <= cutoffDay; d++) {
-    const dateObj = new Date(year, monthIndex, d);
-    if (dateObj.getDay() !== 0) continue; // not Sunday
-    if (joinDay && dateObj < joinDay) continue; // before joining
-    const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const coveredByGlobalHoliday = holidays.some(h => h.date === dateStr && h.type === 'Full');
-    if (coveredByGlobalHoliday) continue;
-    const hasSundayRecord = empAttendance.some(r => r.date === dateStr);
-    if (!hasSundayRecord) autoHolidays++;
+    monthDaysToCount.push(`${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
   }
+
+  // Track manually marked HOLIDAY records (same as AttendanceTracker)
+  const manualHolidayDates = new Set(
+    monthDaysToCount.filter(date => empAttendance.some(r => r.date === date && isHolidayStatus(r.status)))
+  );
+
+  // Count holidays using IDENTICAL logic to AttendanceTracker.getEmpMonthlySummary
+  let autoHolidays = 0;
+  monthDaysToCount.forEach(date => {
+    const r = empAttendance.find(a => a.date === date);
+    const dateObj = new Date(date);
+    const isSun = dateObj.getDay() === 0;
+    const hol = holidays.find(h => h.date === date && h.type === 'Full');
+    const isBeforeJoining = joinDay ? dateObj < joinDay : false;
+    if (isBeforeJoining) return;
+    if (!r) {
+      // No record: count as holiday only if Sunday-off or unrecorded global holiday
+      const coveredByGlobalHoliday = hol && !manualHolidayDates.has(date);
+      const isSundayOff = isSun && !hol;
+      if (coveredByGlobalHoliday || isSundayOff) autoHolidays++;
+    }
+    // Days WITH records are already counted in manualHolidays above
+  });
 
   const totalPaidHolidays = manualHolidays + autoHolidays;
   const totalOvertimeHours = empAttendance.reduce((acc, curr) => acc + (Number(curr.overtimeHours) || 0), 0);
