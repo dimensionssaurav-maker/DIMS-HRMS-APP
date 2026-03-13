@@ -49,13 +49,12 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
   const getMonthRecord = (empId: string, date: string) => records.find(r => r.employeeId === empId && r.date === date);
 
   const getEmpMonthlySummary = (empId: string, days: string[]) => {
-    let present = 0, absent = 0, leave = 0, holiday = 0, late = 0, totalOT = 0;
+    let present = 0, absent = 0, leave = 0, holiday = 0, late = 0, totalOT = 0, halfDays = 0;
     const emp = employees.find(e => e.id === empId);
     const joinDay = emp?.joiningDate
       ? (() => { const d = new Date(emp.joiningDate); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); })()
       : null;
 
-    // Track manually marked HOLIDAY records to avoid double-counting (mirrors payroll logic)
     const manualHolidayDates = new Set(
       days.filter(date => {
         const r = getMonthRecord(empId, date);
@@ -70,25 +69,26 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
       const hol = holidays.find(h => h.date === date && h.type === 'Full');
       const isBeforeJoining = joinDay ? dateObj < joinDay : false;
 
-      if (isBeforeJoining) return; // Don't count days before joining
+      if (isBeforeJoining) return;
 
       if (r) {
-        // Record exists — use its status
-        if (r.status === 'PRESENT' as AttendanceStatus) present++;
+        const v = String(r.status || '').toUpperCase();
+        const isHD = v === 'HD' || v === 'HALFDAY' || v === 'HALF' || v === 'P/H' || v === 'H/P';
+        if (isHD) halfDays++;
+        else if (r.status === 'PRESENT' as AttendanceStatus) present++;
         else if (r.status === 'ABSENT' as AttendanceStatus) absent++;
         else if (r.status === 'LEAVE' as AttendanceStatus) leave++;
         else if (r.status === 'HOLIDAY' as AttendanceStatus) holiday++;
         if (r.lateMinutes && r.lateMinutes > 0) late++;
         totalOT += r.overtimeHours || 0;
       } else {
-        // No record — mirror payroll: only count as holiday if Sunday or unrecorded global holiday
         const coveredByGlobalHoliday = hol && !manualHolidayDates.has(date);
         const isSundayOff = isSun && !hol;
         if (coveredByGlobalHoliday || isSundayOff) holiday++;
-        // else: untracked working day — skip (not yet recorded)
       }
     });
-    return { present, absent, leave, holiday, late, totalOT };
+    const daysPaid = present + (halfDays / 2) + holiday;
+    return { present, absent, leave, holiday, late, totalOT, halfDays, daysPaid };
   };
 
   const handleCellSave = () => {
@@ -728,6 +728,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                 <span className="w-5 h-5 rounded bg-red-100 text-red-700 flex items-center justify-center text-[9px] font-black">A</span><span className="text-slate-500">Absent</span>
                 <span className="w-5 h-5 rounded bg-amber-100 text-amber-700 flex items-center justify-center text-[9px] font-black">L</span><span className="text-slate-500">Leave</span>
                 <span className="w-5 h-5 rounded bg-purple-100 text-purple-700 flex items-center justify-center text-[9px] font-black">H</span><span className="text-slate-500">Holiday</span>
+                <span className="w-5 h-5 rounded bg-sky-100 text-sky-700 flex items-center justify-center text-[9px] font-black">HD</span><span className="text-slate-500">Half Day</span>
               </div>
               <button onClick={() => exportMonthlyCSV(monthDays)}
                 className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-200">
@@ -760,7 +761,8 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                     <th className="px-3 py-3 text-center font-bold bg-red-900/40 border-r border-slate-700 min-w-[40px]">A</th>
                     <th className="px-3 py-3 text-center font-bold bg-amber-900/40 border-r border-slate-700 min-w-[40px]">L</th>
                     <th className="px-3 py-3 text-center font-bold bg-purple-900/40 border-r border-slate-700 min-w-[40px]">H</th>
-                    <th className="px-3 py-3 text-center font-bold bg-orange-900/40 min-w-[44px]">OT</th>
+                    <th className="px-3 py-3 text-center font-bold bg-sky-900/40 border-r border-slate-700 min-w-[44px]">HD</th>
+                    <th className="px-3 py-3 text-center font-bold bg-indigo-900/40 min-w-[60px]">DAYS PAID</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -859,7 +861,9 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                         <td className="px-2 py-2 text-center font-black text-red-600 bg-red-50/50 border-r border-slate-100">{summary.absent}</td>
                         <td className="px-2 py-2 text-center font-black text-amber-600 bg-amber-50/50 border-r border-slate-100">{summary.leave}</td>
                         <td className="px-2 py-2 text-center font-black text-purple-600 bg-purple-50/50 border-r border-slate-100">{summary.holiday}</td>
-                        <td className="px-2 py-2 text-center font-black text-orange-600 bg-orange-50/50">{summary.totalOT > 0 ? summary.totalOT.toFixed(1) : '—'}</td>
+                        <td className="px-2 py-2 text-center font-black text-orange-600 bg-orange-50/50 border-r border-slate-100">{summary.totalOT > 0 ? summary.totalOT.toFixed(1) : '—'}</td>
+                        <td className="px-2 py-2 text-center font-black text-sky-600 bg-sky-50/50 border-r border-slate-100">{summary.halfDays > 0 ? summary.halfDays : '—'}</td>
+                        <td className="px-2 py-2 text-center font-black text-indigo-700 bg-indigo-50/50">{summary.daysPaid > 0 ? summary.daysPaid.toFixed(1).replace('.0','') : '0'}</td>
                       </tr>
                     );
                   })}
@@ -893,8 +897,14 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                     <td className="px-2 py-2 text-center text-purple-300 font-black bg-purple-900/20 border-r border-slate-700">
                       {employees.reduce((s, emp) => s + getEmpMonthlySummary(emp.id, monthDays).holiday, 0)}
                     </td>
-                    <td className="px-2 py-2 text-center text-orange-300 font-black bg-orange-900/20">
+                    <td className="px-2 py-2 text-center text-orange-300 font-black bg-orange-900/20 border-r border-slate-700">
                       {employees.reduce((s, emp) => s + getEmpMonthlySummary(emp.id, monthDays).totalOT, 0).toFixed(1)}
+                    </td>
+                    <td className="px-2 py-2 text-center text-sky-300 font-black bg-sky-900/20 border-r border-slate-700">
+                      {employees.reduce((s, emp) => s + getEmpMonthlySummary(emp.id, monthDays).halfDays, 0)}
+                    </td>
+                    <td className="px-2 py-2 text-center text-indigo-300 font-black bg-indigo-900/20">
+                      {employees.reduce((s, emp) => s + getEmpMonthlySummary(emp.id, monthDays).daysPaid, 0).toFixed(1)}
                     </td>
                   </tr>
                 </tfoot>
