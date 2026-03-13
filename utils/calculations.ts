@@ -67,19 +67,35 @@ export function calculateMonthlyPayroll(
   const daysAbsent     = validAttendance.filter(a => isAbsentStatus(a.status)).length;
   const manualHolidays = validAttendance.filter(a => isHolidayStatus(a.status)).length;
 
-  // Calculate Auto Holidays from the Global Holiday List
   const monthIndex = new Date(`${month} 1, 2000`).getMonth();
+  const daysInMonthTotal = new Date(year, monthIndex + 1, 0).getDate();
+
+  // ── CRITICAL: Only count holidays/Sundays up to the last recorded attendance date ──
+  // Counting the full month would include future Sundays not yet reached,
+  // inflating Days Paid. e.g. running payroll on Mar 13 must NOT count Mar 15, 22, 29.
+  // The "last recorded day" is the highest date with any attendance record for this employee.
+  // If no records exist at all, fall back to today or end of month (whichever is earlier).
+  const lastRecordedDate = empAttendance.length > 0
+    ? empAttendance.reduce((latest, r) => r.date > latest ? r.date : latest, empAttendance[0].date)
+    : null;
+
+  // Cutoff = last day with a record (or today capped at month end if no records)
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const monthEndStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(daysInMonthTotal).padStart(2, '0')}`;
+  const cutoffStr = lastRecordedDate ?? (todayStr < monthEndStr ? todayStr : monthEndStr);
+  const cutoffDay = parseInt(cutoffStr.split('-')[2], 10);
 
   let autoHolidays = 0;
 
-  // Count Full-day global holidays where no manual HOLIDAY record exists yet
+  // Count Full-day global holidays up to cutoff date only
   holidays.forEach(h => {
     if (h.type !== 'Full') return;
     const hDate = new Date(h.date);
     if (joinDay && hDate < joinDay) return;
     if (hDate.getMonth() === monthIndex && hDate.getFullYear() === year) {
-      // Only auto-count if employee has no manual HOLIDAY record for this date
-      // (avoids double-counting when user already marked it manually)
+      // Only up to our cutoff day
+      if (parseInt(h.date.split('-')[2], 10) > cutoffDay) return;
       const hasHolidayRecord = empAttendance.some(
         r => r.date === h.date && isHolidayStatus(r.status)
       );
@@ -87,20 +103,14 @@ export function calculateMonthlyPayroll(
     }
   });
 
-  // Count Sundays as weekly-off holidays (paid)
-  // Only count Sundays where employee has no attendance record at all
-  const daysInMonthForSunday = new Date(year, monthIndex + 1, 0).getDate();
-  for (let d = 1; d <= daysInMonthForSunday; d++) {
+  // Count Sundays as weekly-off holidays — ONLY up to cutoff date, never future Sundays
+  for (let d = 1; d <= cutoffDay; d++) {
     const dateObj = new Date(year, monthIndex, d);
     if (dateObj.getDay() !== 0) continue; // not Sunday
     if (joinDay && dateObj < joinDay) continue; // before joining
     const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    // Skip if a global holiday already covers this Sunday (avoid double count)
-    const coveredByGlobalHoliday = holidays.some(
-      h => h.date === dateStr && h.type === 'Full'
-    );
+    const coveredByGlobalHoliday = holidays.some(h => h.date === dateStr && h.type === 'Full');
     if (coveredByGlobalHoliday) continue;
-    // Only count as weekly-off if no attendance record exists for this Sunday
     const hasSundayRecord = empAttendance.some(r => r.date === dateStr);
     if (!hasSundayRecord) autoHolidays++;
   }
