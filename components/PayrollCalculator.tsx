@@ -110,7 +110,7 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
         const rows = filteredPayroll.map(p => {
           const emp = getEmployee(p.employeeId);
           return [
-            p.employeeId,
+            emp?.employeeCode || p.employeeId,
             `"${emp?.name || ''}"`,
             `"${emp?.department || ''}"`,
             `"${emp?.designation || ''}"`,
@@ -331,7 +331,7 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
                         </div>
                         <div>
                           <p className="font-bold text-slate-800 text-sm">{emp.name}</p>
-                          <p className="text-[10px] text-slate-400 font-mono">{emp.id}</p>
+                          <p className="text-[10px] text-slate-400 font-mono">{emp.employeeCode || emp.id}</p>
                         </div>
                       </div>
                     </td>
@@ -492,7 +492,7 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
                     <div className="flex items-center gap-2">
                         <h2 className="text-xl font-bold text-slate-800">{getEmployee(viewingPayslip.employeeId)?.name}</h2>
                         <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs font-bold font-mono border border-slate-200">
-                            {viewingPayslip.employeeId}
+                            {getEmployee(viewingPayslip.employeeId)?.employeeCode || viewingPayslip.employeeId}
                         </span>
                     </div>
                     <p className="text-sm text-slate-500 font-medium">{getEmployee(viewingPayslip.employeeId)?.designation}</p>
