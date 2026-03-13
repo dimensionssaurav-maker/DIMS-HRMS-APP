@@ -577,7 +577,7 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
                     )}
                     <div className="flex justify-between text-sm pt-2 border-t border-slate-50">
                       <span className="font-bold text-slate-800">Gross Earnings</span>
-                      <span className="font-bold text-slate-800">₹{(viewingPayslip.grossSalary + viewingPayslip.expenseReimbursement).toLocaleString()}</span>
+                      <span className="font-bold text-slate-800">₹{viewingPayslip.grossSalary.toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
