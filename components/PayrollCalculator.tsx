@@ -15,7 +15,9 @@ import {
   Building, 
   TrendingUp,
   Clock,
-  Utensils
+  Utensils,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Employee, PayrollCalculation, Loan } from '../types';
 
@@ -25,9 +27,14 @@ interface Props {
   loans: Loan[];
   month: string;
   year: number;
+  onMonthChange?: (month: string) => void;
+  onYearChange?: (year: number) => void;
 }
 
-const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, year }) => {
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const YEARS = [2023, 2024, 2025, 2026, 2027];
+
+const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, year, onMonthChange, onYearChange }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingPayslip, setViewingPayslip] = useState<PayrollCalculation | null>(null);
   const [isExporting, setIsExporting] = useState<string | null>(null);
@@ -200,12 +207,54 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
 
       {/* Toolbar */}
       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-         <div>
-            <h3 className="text-lg font-bold text-slate-800">Payroll Register</h3>
-            <p className="text-sm text-slate-500">Process and manage salaries for {month} {year} (Active Employees Only)</p>
+         <div className="flex items-center gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-slate-800">Payroll Register</h3>
+              <p className="text-sm text-slate-500">Process and manage salaries for {month} {year} (Active Employees Only)</p>
+            </div>
          </div>
-         
-         <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+
+         <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto items-center">
+
+            {/* ── Month / Year Switcher ── */}
+            {onMonthChange && onYearChange && (
+              <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl p-1">
+                <button
+                  onClick={() => {
+                    const idx = MONTHS.indexOf(month);
+                    if (idx === 0) { onMonthChange(MONTHS[11]); onYearChange(year - 1); }
+                    else onMonthChange(MONTHS[idx - 1]);
+                  }}
+                  className="p-1.5 hover:bg-white rounded-lg text-slate-500 hover:text-indigo-600 transition-all"
+                ><ChevronLeft size={16} /></button>
+
+                <select
+                  value={month}
+                  onChange={e => onMonthChange(e.target.value)}
+                  className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer px-1"
+                >
+                  {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+
+                <select
+                  value={year}
+                  onChange={e => onYearChange(Number(e.target.value))}
+                  className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer px-1"
+                >
+                  {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+
+                <button
+                  onClick={() => {
+                    const idx = MONTHS.indexOf(month);
+                    if (idx === 11) { onMonthChange(MONTHS[0]); onYearChange(year + 1); }
+                    else onMonthChange(MONTHS[idx + 1]);
+                  }}
+                  className="p-1.5 hover:bg-white rounded-lg text-slate-500 hover:text-indigo-600 transition-all"
+                ><ChevronRight size={16} /></button>
+              </div>
+            )}
+
             <div className="flex gap-2">
                <button 
                  onClick={() => handleExport('pdf')}
