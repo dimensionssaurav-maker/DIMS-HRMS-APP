@@ -156,6 +156,8 @@ export function calculateMonthlyPayroll(
 
   let totalLateHours  = 0;
   let totalEarlyHours = 0;
+  let lateCount  = 0;   // instances that actually triggered a deduction (after exemptions)
+  let earlyCount = 0;   // instances that actually triggered a deduction (after exemptions)
   const hourlyRateForDeduction = hourlyRate;
   const lateRuleUsage:  Record<string, number> = {};
   const earlyRuleUsage: Record<string, number> = {};
@@ -182,10 +184,10 @@ export function calculateMonthlyPayroll(
         const rule = findApplicableRule(record.lateMinutes, config.attendanceConfig.lateRules);
         if (rule) {
           lateRuleUsage[rule.id] = (lateRuleUsage[rule.id] || 0) + 1;
-          if (lateRuleUsage[rule.id] > (rule.exemptionsCount || 0)) totalLateHours += rule.deductionAmount;
+          if (lateRuleUsage[rule.id] > (rule.exemptionsCount || 0)) { totalLateHours += rule.deductionAmount; lateCount++; }
         }
       } else {
-        totalLateHours += (record.lateMinutes / 60);
+        totalLateHours += (record.lateMinutes / 60); lateCount++;
       }
     }
 
@@ -201,7 +203,7 @@ export function calculateMonthlyPayroll(
         const rule = findApplicableRule(effectiveEarlyMinutes, config.attendanceConfig.earlyExitRules);
         if (rule) {
           earlyRuleUsage[rule.id] = (earlyRuleUsage[rule.id] || 0) + 1;
-          if (earlyRuleUsage[rule.id] > (rule.exemptionsCount || 0)) totalEarlyHours += rule.deductionAmount;
+          if (earlyRuleUsage[rule.id] > (rule.exemptionsCount || 0)) { totalEarlyHours += rule.deductionAmount; earlyCount++; }
         }
       }
     }
@@ -282,6 +284,8 @@ export function calculateMonthlyPayroll(
     loanDeduction: totalLoanDeduction,
     lateDeduction,
     earlyDeduction,
+    lateCount,
+    earlyCount,
     netPayable: roundedNetPayable
   };
 }
