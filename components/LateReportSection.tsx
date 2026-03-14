@@ -26,8 +26,14 @@ const LateReportSection: React.FC<Props> = ({ employees, attendance, shifts, sta
   const lateData = useMemo(() => {
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
-    const records = attendance.filter(r => {
+
+    // Deduplicate: keep only one record per employeeId+date before filtering
+    const deduped = new Map<string, AttendanceRecord>();
+    for (const r of attendance) {
+      deduped.set(`${r.employeeId}-${r.date}`, r);
+    }
+
+    const records = Array.from(deduped.values()).filter(r => {
       const d = new Date(r.date);
       return d >= start && d <= end && r.status === 'PRESENT' && r.checkIn;
     });
