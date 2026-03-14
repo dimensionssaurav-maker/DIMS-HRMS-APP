@@ -139,6 +139,8 @@ export interface PayrollCalculation {
   earlyDeduction: number;
   lateCount: number;       // number of late arrival instances that triggered deduction
   earlyCount: number;      // number of early exit instances that triggered deduction
+  lateHours: number;       // total deductible late hours
+  earlyHours: number;      // total deductible early-exit hours
   netPayable: number;
 }
 
