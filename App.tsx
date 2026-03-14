@@ -146,7 +146,10 @@ export default function App() {
             const name = rec.empName || rec.employeeName || rec.name || '';
             if (!code || existingCodes.has(code) || newEmpsMap[code]) continue;
             newEmpsMap[code] = {
-              id:           rec.id || code,
+              // NEVER use rec.id here — rec.id is the attendance document ID (e.g. "0475_2026-03-12")
+              // Using it as employee id causes "No document to update" when marking as Left/Delete
+              // Use the biometric code as id; Firebase assigns real doc id after addData()
+              id:           code,
               employeeCode: code,
               name:         name || `Employee ${code}`,
               designation:  '',
@@ -171,11 +174,16 @@ export default function App() {
           }
           const autoEmps = Object.values(newEmpsMap);
           if (autoEmps.length > 0) {
-            // Save auto-created employees to Firebase so they persist
+            // Save auto-created employees to Firebase and update id to real Firebase doc id
             for (const emp of autoEmps) {
-              try { await addData('employees', emp); } catch {}
+              try {
+                const ref = await addData('employees', emp);
+                // Replace temp code-based id with real Firebase document id
+                empList.push({ ...emp, id: ref.id });
+              } catch {
+                empList.push(emp);
+              }
             }
-            empList.push(...autoEmps);
           }
         }
 
