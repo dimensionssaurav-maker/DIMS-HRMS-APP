@@ -64,7 +64,9 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
       overtime: acc.overtime + curr.overtimePay,
       fooding: acc.fooding + curr.foodingAllowance,
       expenseReimbursement: acc.expenseReimbursement + curr.expenseReimbursement,
+      lateHours: acc.lateHours + (curr.lateHours || 0),
       lateDeduction: acc.lateDeduction + curr.lateDeduction,
+      earlyHours: acc.earlyHours + (curr.earlyHours || 0),
       earlyDeduction: acc.earlyDeduction + curr.earlyDeduction,
       esicEmployee: acc.esicEmployee + curr.esicEmployeeShare,
       esicEmployer: acc.esicEmployer + curr.esicEmployerShare,
@@ -79,7 +81,9 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
         overtime: 0, 
         fooding: 0, 
         expenseReimbursement: 0, 
+        lateHours: 0,
         lateDeduction: 0, 
+        earlyHours: 0,
         earlyDeduction: 0,
         esicEmployee: 0, 
         esicEmployer: 0,
@@ -104,7 +108,7 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
         const headers = [
           'Employee ID', 'Name', 'Department', 'Designation', 
           'Days Paid', 'Total Overtime Hours', 'Overtime Pay', 'Fooding Allow.', 'Expenses', 'Gross Salary', 
-          'Late Deduction', 'Late Instances', 'Early Deduction', 'Early Instances', 'ESIC Employee', 'LWF Employee', 'Loan Deduct', 
+          'Late Pts', 'Late Deduction', 'Early Pts', 'Early Deduction', 'ESIC Employee', 'LWF Employee', 'Loan Deduct', 
           'Net Payable', 'Service Charge', 'ESIC Employer', 'LWF Employer'
         ];
         const rows = filteredPayroll.map(p => {
@@ -120,10 +124,10 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
             p.foodingAllowance,
             p.expenseReimbursement,
             p.grossSalary,
-            p.lateDeduction,
             p.lateCount || 0,
-            p.earlyDeduction,
+            p.lateDeduction,
             p.earlyCount || 0,
+            p.earlyDeduction,
             p.esicEmployeeShare,
             p.lwfEmployeeShare,
             p.loanDeduction,
@@ -302,8 +306,10 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Fooding</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Gross</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Expenses</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Late Ded.</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Early Ded.</th>
+                <th className="px-4 py-4 text-xs font-bold text-rose-500 uppercase tracking-wider text-right">Late Pts</th>
+                <th className="px-4 py-4 text-xs font-bold text-rose-500 uppercase tracking-wider text-right">Late Ded.</th>
+                <th className="px-4 py-4 text-xs font-bold text-orange-500 uppercase tracking-wider text-right">Early Pts</th>
+                <th className="px-4 py-4 text-xs font-bold text-orange-500 uppercase tracking-wider text-right">Early Ded.</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">ESIC (Emp)</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">LWF (Emp)</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Loans</th>
@@ -355,24 +361,24 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
                     <td className="px-6 py-4 text-right text-sm font-medium text-purple-600">
                       {pay.expenseReimbursement > 0 ? `+₹${pay.expenseReimbursement.toLocaleString()}` : '-'}
                     </td>
-                    <td className="px-6 py-4 text-right text-sm font-medium text-rose-500">
-                      {pay.lateDeduction > 0 ? (
-                        <div className="flex flex-col items-end gap-0.5">
-                          <span className="font-bold">-₹{pay.lateDeduction.toLocaleString()}</span>
-                          <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full font-bold">
-                            {pay.lateCount} {pay.lateCount === 1 ? 'instance' : 'instances'}
-                          </span>
-                        </div>
+                    <td className="px-4 py-4 text-right text-sm font-medium text-rose-500">
+                      {pay.lateCount > 0 ? (
+                        <span className="font-bold bg-rose-50 text-rose-600 px-2 py-0.5 rounded-lg">{pay.lateCount}</span>
                       ) : '-'}
                     </td>
-                    <td className="px-6 py-4 text-right text-sm font-medium text-orange-500">
+                    <td className="px-4 py-4 text-right text-sm font-medium text-rose-500">
+                      {pay.lateDeduction > 0 ? (
+                        <span className="font-bold">-₹{pay.lateDeduction.toLocaleString()}</span>
+                      ) : '-'}
+                    </td>
+                    <td className="px-4 py-4 text-right text-sm font-medium text-orange-500">
+                      {pay.earlyCount > 0 ? (
+                        <span className="font-bold bg-orange-50 text-orange-600 px-2 py-0.5 rounded-lg">{pay.earlyCount}</span>
+                      ) : '-'}
+                    </td>
+                    <td className="px-4 py-4 text-right text-sm font-medium text-orange-500">
                       {pay.earlyDeduction > 0 ? (
-                        <div className="flex flex-col items-end gap-0.5">
-                          <span className="font-bold">-₹{pay.earlyDeduction.toLocaleString()}</span>
-                          <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full font-bold">
-                            {pay.earlyCount} {pay.earlyCount === 1 ? 'instance' : 'instances'}
-                          </span>
-                        </div>
+                        <span className="font-bold">-₹{pay.earlyDeduction.toLocaleString()}</span>
                       ) : '-'}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-medium text-rose-500">
@@ -417,8 +423,10 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
                   <td className="px-6 py-4 text-right text-sm font-bold text-orange-600">₹{columnTotals.fooding.toLocaleString()}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-slate-800">₹{columnTotals.gross.toLocaleString()}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-purple-600">+₹{columnTotals.expenseReimbursement.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-right text-sm font-bold text-rose-600">-₹{columnTotals.lateDeduction.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-right text-sm font-bold text-orange-600">-₹{columnTotals.earlyDeduction.toLocaleString()}</td>
+                  <td className="px-4 py-4 text-right text-sm font-bold text-rose-600">{filteredPayroll.reduce((s,p) => s + (p.lateCount||0), 0) > 0 ? filteredPayroll.reduce((s,p) => s + (p.lateCount||0), 0) : '-'}</td>
+                  <td className="px-4 py-4 text-right text-sm font-bold text-rose-600">-₹{columnTotals.lateDeduction.toLocaleString()}</td>
+                  <td className="px-4 py-4 text-right text-sm font-bold text-orange-600">{filteredPayroll.reduce((s,p) => s + (p.earlyCount||0), 0) > 0 ? filteredPayroll.reduce((s,p) => s + (p.earlyCount||0), 0) : '-'}</td>
+                  <td className="px-4 py-4 text-right text-sm font-bold text-orange-600">-₹{columnTotals.earlyDeduction.toLocaleString()}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-rose-600">-₹{columnTotals.esicEmployee.toLocaleString()}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-rose-600">-₹{columnTotals.lwfEmployee.toLocaleString()}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-amber-600">-₹{columnTotals.loanDeduction.toLocaleString()}</td>
