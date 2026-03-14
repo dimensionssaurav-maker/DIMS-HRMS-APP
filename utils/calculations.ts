@@ -168,14 +168,19 @@ export function calculateMonthlyPayroll(
       r.enabled && (r.department === 'All Departments' || !r.department || r.department === employee.department)
     );
     if (applicableRules.length === 0) return null;
+    // Prefer department-specific rules over 'All Departments'
     const sortedRules = applicableRules.sort((a, b) => {
       const aS = a.department && a.department !== 'All Departments';
       const bS = b.department && b.department !== 'All Departments';
       if (aS && !bS) return -1;
       if (!aS && bS) return 1;
-      return b.thresholdMinutes - a.thresholdMinutes;
+      return a.thresholdMinutes - b.thresholdMinutes; // ascending: match lowest slab first
     });
-    return sortedRules.find(r => minutes > r.thresholdMinutes);
+    // Slab match: minutes > thresholdMinutes AND (no maxMinutes OR minutes <= maxMinutes)
+    return sortedRules.find(r =>
+      minutes > r.thresholdMinutes &&
+      (r.maxMinutes === undefined || r.maxMinutes === null || minutes <= r.maxMinutes)
+    );
   };
 
   empAttendance.forEach(record => {
