@@ -286,6 +286,8 @@ export function calculateMonthlyPayroll(
     earlyDeduction,
     lateCount,
     earlyCount,
+    lateHours: Math.round(totalLateHours * 100) / 100,
+    earlyHours: Math.round(totalEarlyHours * 100) / 100,
     netPayable: roundedNetPayable
   };
 }
