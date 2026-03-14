@@ -300,7 +300,8 @@ const SettingsModule: React.FC<Props> = ({ payrollConfig, onUpdatePayrollConfig,
           id: `${type}-${Date.now()}`,
           department: 'All Departments',
           thresholdMinutes: type === 'lateRules' ? 15 : 30,
-          deductionAmount: 0.5,
+          maxMinutes: type === 'lateRules' ? 55 : 60,
+          deductionAmount: 1,
           exemptionsCount: 0,
           enabled: true
       };
@@ -864,59 +865,60 @@ const SettingsModule: React.FC<Props> = ({ payrollConfig, onUpdatePayrollConfig,
                       onClick={() => addRule('lateRules')}
                       className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 flex items-center gap-1"
                     >
-                      <Plus size={14} /> Add Rule
+                      <Plus size={14} /> Add Slab
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 gap-3">
                     {localPayrollConfig.attendanceConfig?.lateRules.map((rule, idx) => (
-                      <div key={rule.id} className="bg-slate-50 p-5 rounded-2xl border border-slate-200 flex flex-wrap items-center gap-6">
-                        <div className="flex-1 min-w-[200px]">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Department</label>
-                          <select 
-                            value={rule.department}
-                            onChange={(e) => updateRule('lateRules', idx, 'department', e.target.value)}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold outline-none"
-                          >
-                            <option value="All Departments">All Departments</option>
-                            {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                          </select>
+                      <div key={rule.id} className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                        <div className="flex flex-wrap items-end gap-4">
+                          <div className="flex-1 min-w-[180px]">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Department</label>
+                            <select value={rule.department} onChange={(e) => updateRule('lateRules', idx, 'department', e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold outline-none">
+                              <option value="All Departments">All Departments</option>
+                              {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                            </select>
+                          </div>
+                          <div className="w-24">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">From (Min)</label>
+                            <input type="number" value={rule.thresholdMinutes}
+                              onChange={(e) => updateRule('lateRules', idx, 'thresholdMinutes', parseInt(e.target.value))}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none" />
+                          </div>
+                          <div className="w-24">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">To (Min)</label>
+                            <input type="number" value={(rule as any).maxMinutes ?? ''} placeholder="∞"
+                              onChange={(e) => updateRule('lateRules', idx, 'maxMinutes' as any, e.target.value === '' ? undefined : parseInt(e.target.value))}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none" />
+                          </div>
+                          <div className="w-28">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Deduction (Hrs)</label>
+                            <input type="number" step="0.5" value={rule.deductionAmount}
+                              onChange={(e) => updateRule('lateRules', idx, 'deductionAmount', parseFloat(e.target.value))}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none" />
+                          </div>
+                          <div className="w-24">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Exemptions</label>
+                            <input type="number" value={rule.exemptionsCount ?? 0}
+                              onChange={(e) => updateRule('lateRules', idx, 'exemptionsCount', parseInt(e.target.value))}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none" />
+                          </div>
+                          <button onClick={() => removeRule('lateRules', idx)}
+                            className="mb-0.5 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                            <Trash2 size={18} />
+                          </button>
                         </div>
-                        <div className="w-24">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Grace (Min)</label>
-                          <input 
-                            type="number"
-                            value={rule.thresholdMinutes}
-                            onChange={(e) => updateRule('lateRules', idx, 'thresholdMinutes', parseInt(e.target.value))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none"
-                          />
-                        </div>
-                        <div className="w-24">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Deduction (Day)</label>
-                          <input 
-                            type="number"
-                            step="0.1"
-                            value={rule.deductionAmount}
-                            onChange={(e) => updateRule('lateRules', idx, 'deductionAmount', parseFloat(e.target.value))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none"
-                          />
-                        </div>
-                        <div className="w-24">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Exemptions</label>
-                          <input 
-                            type="number"
-                            value={rule.exemptionsCount}
-                            onChange={(e) => updateRule('lateRules', idx, 'exemptionsCount', parseInt(e.target.value))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none"
-                          />
-                        </div>
-                        <button 
-                          onClick={() => removeRule('lateRules', idx)}
-                          className="mt-5 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        <p className="text-[10px] text-rose-400 mt-2 font-semibold">
+                          Slab: late &gt; {rule.thresholdMinutes} min{(rule as any).maxMinutes ? ` and ≤ ${(rule as any).maxMinutes} min` : ' (no upper limit)'} → deduct {rule.deductionAmount} hr(s) of salary
+                        </p>
                       </div>
                     ))}
+                    {(!localPayrollConfig.attendanceConfig?.lateRules.length) && (
+                      <div className="text-center py-6 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-2xl">
+                        No late rules configured. Click <span className="font-bold text-indigo-500">+ Add Slab</span> to define penalties.
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -924,68 +926,62 @@ const SettingsModule: React.FC<Props> = ({ payrollConfig, onUpdatePayrollConfig,
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <h4 className="font-bold text-slate-700 flex items-center gap-2">
-                      <LogOut size={18} className="text-rose-500" /> Early Exit Penalties
+                      <LogOut size={18} className="text-orange-500" /> Early Exit Penalties
                     </h4>
-                    <button
-                      onClick={() => addRule('earlyExitRules')}
-                      className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 flex items-center gap-1"
-                    >
-                      <Plus size={14} /> Add Rule
+                    <button onClick={() => addRule('earlyExitRules')}
+                      className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 flex items-center gap-1">
+                      <Plus size={14} /> Add Slab
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 gap-3">
                     {localPayrollConfig.attendanceConfig?.earlyExitRules.map((rule, idx) => (
-                      <div key={rule.id} className="bg-slate-50 p-5 rounded-2xl border border-slate-200 flex flex-wrap items-center gap-6">
-                        <div className="flex-1 min-w-[200px]">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Department</label>
-                          <select
-                            value={rule.department}
-                            onChange={(e) => updateRule('earlyExitRules', idx, 'department', e.target.value)}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold outline-none"
-                          >
-                            <option value="All Departments">All Departments</option>
-                            {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                          </select>
+                      <div key={rule.id} className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                        <div className="flex flex-wrap items-end gap-4">
+                          <div className="flex-1 min-w-[180px]">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Department</label>
+                            <select value={rule.department} onChange={(e) => updateRule('earlyExitRules', idx, 'department', e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold outline-none">
+                              <option value="All Departments">All Departments</option>
+                              {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                            </select>
+                          </div>
+                          <div className="w-24">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">From (Min)</label>
+                            <input type="number" value={rule.thresholdMinutes}
+                              onChange={(e) => updateRule('earlyExitRules', idx, 'thresholdMinutes', parseInt(e.target.value))}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none" />
+                          </div>
+                          <div className="w-24">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">To (Min)</label>
+                            <input type="number" value={(rule as any).maxMinutes ?? ''} placeholder="∞"
+                              onChange={(e) => updateRule('earlyExitRules', idx, 'maxMinutes' as any, e.target.value === '' ? undefined : parseInt(e.target.value))}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none" />
+                          </div>
+                          <div className="w-28">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Deduction (Hrs)</label>
+                            <input type="number" step="0.5" value={rule.deductionAmount}
+                              onChange={(e) => updateRule('earlyExitRules', idx, 'deductionAmount', parseFloat(e.target.value))}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none" />
+                          </div>
+                          <div className="w-24">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Exemptions</label>
+                            <input type="number" value={rule.exemptionsCount ?? 0}
+                              onChange={(e) => updateRule('earlyExitRules', idx, 'exemptionsCount', parseInt(e.target.value))}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none" />
+                          </div>
+                          <button onClick={() => removeRule('earlyExitRules', idx)}
+                            className="mb-0.5 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                            <Trash2 size={18} />
+                          </button>
                         </div>
-                        <div className="w-24">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Grace (Min)</label>
-                          <input
-                            type="number"
-                            value={rule.thresholdMinutes}
-                            onChange={(e) => updateRule('earlyExitRules', idx, 'thresholdMinutes', parseInt(e.target.value))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none"
-                          />
-                        </div>
-                        <div className="w-24">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Deduction (Day)</label>
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={rule.deductionAmount}
-                            onChange={(e) => updateRule('earlyExitRules', idx, 'deductionAmount', parseFloat(e.target.value))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none"
-                          />
-                        </div>
-                        <div className="w-24">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Exemptions</label>
-                          <input
-                            type="number"
-                            value={rule.exemptionsCount}
-                            onChange={(e) => updateRule('earlyExitRules', idx, 'exemptionsCount', parseInt(e.target.value))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none"
-                          />
-                        </div>
-                        <button
-                          onClick={() => removeRule('earlyExitRules', idx)}
-                          className="mt-5 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        <p className="text-[10px] text-orange-400 mt-2 font-semibold">
+                          Slab: early exit &gt; {rule.thresholdMinutes} min{(rule as any).maxMinutes ? ` and ≤ ${(rule as any).maxMinutes} min` : ' (no upper limit)'} → deduct {rule.deductionAmount} hr(s) of salary
+                        </p>
                       </div>
                     ))}
-                    {localPayrollConfig.attendanceConfig?.earlyExitRules.length === 0 && (
+                    {(!localPayrollConfig.attendanceConfig?.earlyExitRules.length) && (
                       <div className="text-center py-6 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-2xl">
-                        No early exit rules configured. Click <span className="font-bold text-indigo-500">+ Add Rule</span> to define penalties.
+                        No early exit rules configured. Click <span className="font-bold text-indigo-500">+ Add Slab</span> to define penalties.
                       </div>
                     )}
                   </div>
