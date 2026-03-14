@@ -12,10 +12,11 @@ export { LeaveStatus } from './enums';
 
 export interface DeductionRule {
   id: string;
-  department?: string; // Optional for backward compatibility, defaults to 'All Departments'
-  thresholdMinutes: number;
-  deductionAmount: number; // In hours
-  exemptionsCount?: number; // Number of times exempted per month
+  department?: string;      // Optional, defaults to 'All Departments'
+  thresholdMinutes: number; // Slab FROM: late/early more than this many minutes
+  maxMinutes?: number;      // Slab TO: late/early up to this many minutes (undefined = no upper limit)
+  deductionAmount: number;  // Deduction in salary-hours
+  exemptionsCount?: number; // Times exempted per month before deduction applies
   enabled: boolean;
 }
 
@@ -137,10 +138,10 @@ export interface PayrollCalculation {
   loanDeduction: number;
   lateDeduction: number;
   earlyDeduction: number;
-  lateCount: number;       // number of late arrival instances that triggered deduction
-  earlyCount: number;      // number of early exit instances that triggered deduction
-  lateHours: number;       // total deductible late hours
-  earlyHours: number;      // total deductible early-exit hours
+  lateCount: number;
+  earlyCount: number;
+  lateHours: number;
+  earlyHours: number;
   netPayable: number;
 }
 
