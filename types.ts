@@ -1,4 +1,3 @@
-
 export { AttendanceStatus } from './enums';
 
 export { ExpenseCategory } from './enums';
@@ -137,7 +136,9 @@ export interface PayrollCalculation {
   serviceCharge: number;
   loanDeduction: number;
   lateDeduction: number;
-  earlyDeduction: number; // New Field
+  earlyDeduction: number;
+  lateCount: number;       // number of late arrival instances that triggered deduction
+  earlyCount: number;      // number of early exit instances that triggered deduction
   netPayable: number;
 }
 
