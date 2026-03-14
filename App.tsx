@@ -25,6 +25,7 @@ import ExpenseReportSection from './components/ExpenseReportSection.tsx';
 import YearlyExpenseReportSection from './components/YearlyExpenseReportSection.tsx';
 import LoanRecoveryReportSection from './components/LoanRecoveryReportSection.tsx';
 import LateReportSection from './components/LateReportSection.tsx';
+import EarlyLeaveReportSection from './components/EarlyLeaveReportSection.tsx';
 import LeftEmployeesReportSection from './components/LeftEmployeesReportSection.tsx';
 import ServiceChargeReportSection from './components/ServiceChargeReportSection.tsx';
 
@@ -47,6 +48,7 @@ const ReportsModule = ({ employees, payroll, expenses, loans, attendance, shifts
           { id: 'expense', label: 'Expense Analysis' },
           { id: 'loans', label: 'Loan Recovery' },
           { id: 'late', label: 'Late Arrivals' },
+          { id: 'early', label: 'Early Leaving' },
           { id: 'leavers', label: 'Ex-Employees' },
             { id: 'service', label: '₹ Service Charge' }
         ].map(type => (
@@ -61,6 +63,7 @@ const ReportsModule = ({ employees, payroll, expenses, loans, attendance, shifts
       {reportType === 'expense' && (<div className="space-y-6"><ExpenseReportSection expenses={expenses} month={month} year={year} /><YearlyExpenseReportSection expenses={expenses} year={year} /></div>)}
       {reportType === 'loans' && <LoanRecoveryReportSection loans={loans} employees={employees} />}
       {reportType === 'late' && <LateReportSection employees={employees} attendance={attendance} shifts={shifts} startDate={`${year}-01-01`} endDate={`${year}-12-31`} />}
+      {reportType === 'early' && <EarlyLeaveReportSection employees={employees} attendance={attendance} shifts={shifts} startDate={`${year}-01-01`} endDate={`${year}-12-31`} />}
       {reportType === 'leavers' && <LeftEmployeesReportSection employees={employees} />}
       {reportType === 'service' && <ServiceChargeReportSection payroll={payroll} employees={employees} year={year} month={month} />}
     </div>
@@ -146,10 +149,7 @@ export default function App() {
             const name = rec.empName || rec.employeeName || rec.name || '';
             if (!code || existingCodes.has(code) || newEmpsMap[code]) continue;
             newEmpsMap[code] = {
-              // NEVER use rec.id here — rec.id is the attendance document ID (e.g. "0475_2026-03-12")
-              // Using it as employee id causes "No document to update" when marking as Left/Delete
-              // Use the biometric code as id; Firebase assigns real doc id after addData()
-              id:           code,
+              id:           rec.id || code,
               employeeCode: code,
               name:         name || `Employee ${code}`,
               designation:  '',
@@ -174,16 +174,11 @@ export default function App() {
           }
           const autoEmps = Object.values(newEmpsMap);
           if (autoEmps.length > 0) {
-            // Save auto-created employees to Firebase and update id to real Firebase doc id
+            // Save auto-created employees to Firebase so they persist
             for (const emp of autoEmps) {
-              try {
-                const ref = await addData('employees', emp);
-                // Replace temp code-based id with real Firebase document id
-                empList.push({ ...emp, id: ref.id });
-              } catch {
-                empList.push(emp);
-              }
+              try { await addData('employees', emp); } catch {}
             }
+            empList.push(...autoEmps);
           }
         }
 
@@ -208,17 +203,26 @@ export default function App() {
           return 'PRESENT' as AttendanceStatus; // default
         };
 
-        const fixedAtt: AttendanceRecord[] = attList.map((rec: any) => {
+        // Deduplicate attendance on load: keep only the LATEST record per employeeId+date
+        // (duplicates were created by the old always-addData bug)
+        const rawAtt: any[] = attList.map((rec: any) => {
           const empCode    = rec.empCode || rec.employeeCode || rec.employeeId || '';
           const employeeId = empCodeToId[empCode] || empCode;
           return {
             ...rec,
             employeeId,
+            docId:    rec.id,   // preserve Firestore doc ID for future upserts
             checkIn:  rec.checkIn  || rec.punchIn  || '',
             checkOut: rec.checkOut || rec.punchOut || '',
             status:   normalizeStatus(rec.status),
-          } as AttendanceRecord;
+          };
         });
+        // Deduplicate: keep last record per employeeId+date (most recently added wins)
+        const attMap = new Map<string, any>();
+        for (const rec of rawAtt) {
+          attMap.set(`${rec.employeeId}-${rec.date}`, rec);
+        }
+        const fixedAtt: AttendanceRecord[] = Array.from(attMap.values()) as AttendanceRecord[];
 
         setEmployees(empList);
         setAttendanceRecords(fixedAtt);
@@ -338,7 +342,18 @@ export default function App() {
   // ── ATTENDANCE handlers ────────────────────────────────────────────────
   const handleAttendanceUpdate = async (record: AttendanceRecord) => {
     try {
-      await addData("attendance", record);
+      // UPSERT: update existing Firestore doc if found, create new only if not exists.
+      // Always using addData() was creating duplicate records for the same employee+date.
+      const existing = attendanceRecords.find(
+        r => r.employeeId === record.employeeId && r.date === record.date
+      );
+      const existingDocId = existing ? ((existing as any).docId || existing.id) : null;
+      if (existingDocId) {
+        await updateData("attendance", existingDocId, record);
+      } else {
+        const ref = await addData("attendance", record);
+        (record as any).docId = ref.id;
+      }
       setAttendanceRecords(prev => {
         const idx = prev.findIndex(r => r.employeeId === record.employeeId && r.date === record.date);
         if (idx >= 0) { const n = [...prev]; n[idx] = record; return n; }
@@ -348,7 +363,19 @@ export default function App() {
   };
   const handleAttendanceBulkUpdate = async (newRecords: AttendanceRecord[]) => {
     try {
-      for (const r of newRecords) await addData("attendance", r);
+      // UPSERT each record: update if exists, create if new
+      for (const r of newRecords) {
+        const existing = attendanceRecords.find(
+          ex => ex.employeeId === r.employeeId && ex.date === r.date
+        );
+        const existingDocId = existing ? ((existing as any).docId || existing.id) : null;
+        if (existingDocId) {
+          await updateData("attendance", existingDocId, r);
+        } else {
+          const ref = await addData("attendance", r);
+          (r as any).docId = ref.id;
+        }
+      }
       const keys = new Set(newRecords.map(r => `${r.employeeId}-${r.date}`));
       setAttendanceRecords(prev => [...prev.filter(r => !keys.has(`${r.employeeId}-${r.date}`)), ...newRecords]);
     } catch (e) { console.error("Bulk attendance error:", e); }
