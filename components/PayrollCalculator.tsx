@@ -104,7 +104,7 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
         const headers = [
           'Employee ID', 'Name', 'Department', 'Designation', 
           'Days Paid', 'Total Overtime Hours', 'Overtime Pay', 'Fooding Allow.', 'Expenses', 'Gross Salary', 
-          'Late Deduction', 'Early Deduction', 'ESIC Employee', 'LWF Employee', 'Loan Deduct', 
+          'Late Deduction', 'Late Instances', 'Early Deduction', 'Early Instances', 'ESIC Employee', 'LWF Employee', 'Loan Deduct', 
           'Net Payable', 'Service Charge', 'ESIC Employer', 'LWF Employer'
         ];
         const rows = filteredPayroll.map(p => {
@@ -121,7 +121,9 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
             p.expenseReimbursement,
             p.grossSalary,
             p.lateDeduction,
+            p.lateCount || 0,
             p.earlyDeduction,
+            p.earlyCount || 0,
             p.esicEmployeeShare,
             p.lwfEmployeeShare,
             p.loanDeduction,
@@ -331,7 +333,7 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
                         </div>
                         <div>
                           <p className="font-bold text-slate-800 text-sm">{emp.name}</p>
-                          <p className="text-[10px] text-slate-400 font-mono">{emp.employeeCode || emp.id}</p>
+                          <p className="text-[10px] text-slate-400 font-mono">{emp.id}</p>
                         </div>
                       </div>
                     </td>
@@ -354,10 +356,24 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
                       {pay.expenseReimbursement > 0 ? `+₹${pay.expenseReimbursement.toLocaleString()}` : '-'}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-medium text-rose-500">
-                      {pay.lateDeduction > 0 ? `-₹${pay.lateDeduction.toLocaleString()}` : '-'}
+                      {pay.lateDeduction > 0 ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="font-bold">-₹{pay.lateDeduction.toLocaleString()}</span>
+                          <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full font-bold">
+                            {pay.lateCount} {pay.lateCount === 1 ? 'instance' : 'instances'}
+                          </span>
+                        </div>
+                      ) : '-'}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-medium text-orange-500">
-                      {pay.earlyDeduction > 0 ? `-₹${pay.earlyDeduction.toLocaleString()}` : '-'}
+                      {pay.earlyDeduction > 0 ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="font-bold">-₹{pay.earlyDeduction.toLocaleString()}</span>
+                          <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full font-bold">
+                            {pay.earlyCount} {pay.earlyCount === 1 ? 'instance' : 'instances'}
+                          </span>
+                        </div>
+                      ) : '-'}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-medium text-rose-500">
                       {pay.esicEmployeeShare > 0 ? `-₹${pay.esicEmployeeShare.toLocaleString()}` : '-'}
@@ -492,7 +508,7 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
                     <div className="flex items-center gap-2">
                         <h2 className="text-xl font-bold text-slate-800">{getEmployee(viewingPayslip.employeeId)?.name}</h2>
                         <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs font-bold font-mono border border-slate-200">
-                            {getEmployee(viewingPayslip.employeeId)?.employeeCode || viewingPayslip.employeeId}
+                            {viewingPayslip.employeeId}
                         </span>
                     </div>
                     <p className="text-sm text-slate-500 font-medium">{getEmployee(viewingPayslip.employeeId)?.designation}</p>
@@ -591,13 +607,23 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
                   <div className="space-y-2">
                     {viewingPayslip.lateDeduction > 0 && (
                         <div className="flex justify-between text-sm">
-                            <span className="text-slate-500">Late Deduction</span>
+                            <span className="text-slate-500 flex items-center gap-2">
+                              Late Deduction
+                              <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full font-bold">
+                                {viewingPayslip.lateCount} {viewingPayslip.lateCount === 1 ? 'instance' : 'instances'}
+                              </span>
+                            </span>
                             <span className="font-bold text-rose-600">-₹{viewingPayslip.lateDeduction.toLocaleString()}</span>
                         </div>
                     )}
                     {viewingPayslip.earlyDeduction > 0 && (
                         <div className="flex justify-between text-sm">
-                            <span className="text-slate-500">Early Deduction</span>
+                            <span className="text-slate-500 flex items-center gap-2">
+                              Early Exit Deduction
+                              <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full font-bold">
+                                {viewingPayslip.earlyCount} {viewingPayslip.earlyCount === 1 ? 'instance' : 'instances'}
+                              </span>
+                            </span>
                             <span className="font-bold text-rose-600">-₹{viewingPayslip.earlyDeduction.toLocaleString()}</span>
                         </div>
                     )}
