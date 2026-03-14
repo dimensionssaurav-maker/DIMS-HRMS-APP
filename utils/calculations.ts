@@ -71,17 +71,10 @@ export function calculateMonthlyPayroll(
   const daysInMonthTotal = new Date(year, monthIndex + 1, 0).getDate();
 
   // ── Mirror AttendanceTracker.getEmpMonthlySummary EXACTLY ──────────────────
-  // Build the array of days to consider — same as attendance tracker does:
-  // only days UP TO today (or month end if month is complete), never future days.
-  const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-  const monthEndStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(daysInMonthTotal).padStart(2, '0')}`;
-  const cutoffStr = todayStr < monthEndStr ? todayStr : monthEndStr;
-  const cutoffDay = parseInt(cutoffStr.split('-')[2], 10);
-
-  // Build the days array exactly as AttendanceTracker does (only days up to cutoff)
+  // Use FULL month days — same as the attendance page display.
+  // This ensures payroll DAYS = attendance DAYS PAID always match.
   const monthDaysToCount: string[] = [];
-  for (let d = 1; d <= cutoffDay; d++) {
+  for (let d = 1; d <= daysInMonthTotal; d++) {
     monthDaysToCount.push(`${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
   }
 
@@ -100,12 +93,10 @@ export function calculateMonthlyPayroll(
     const isBeforeJoining = joinDay ? dateObj < joinDay : false;
     if (isBeforeJoining) return;
     if (!r) {
-      // No record: count as holiday only if Sunday-off or unrecorded global holiday
       const coveredByGlobalHoliday = hol && !manualHolidayDates.has(date);
       const isSundayOff = isSun && !hol;
       if (coveredByGlobalHoliday || isSundayOff) autoHolidays++;
     }
-    // Days WITH records are already counted in manualHolidays above
   });
 
   const totalPaidHolidays = manualHolidays + autoHolidays;
