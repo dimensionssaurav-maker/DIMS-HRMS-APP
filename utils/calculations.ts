@@ -59,51 +59,49 @@ export function calculateMonthlyPayroll(
     return aDate >= joinDay;
   });
 
-  // RULE: Days Paid = PRESENT + (HALFDAY / 2) + HOLIDAY
-  // Full present = PRESENT only (not half-days)
-  const daysPresent    = validAttendance.filter(a => isPresentStatus(a.status) && !isHalfDayStatus(a.status)).length;
-  // Half days count as 0.5 each toward Days Paid
-  const halfDays       = validAttendance.filter(a => isHalfDayStatus(a.status)).length;
-  const daysAbsent     = validAttendance.filter(a => isAbsentStatus(a.status)).length;
-  const manualHolidays = validAttendance.filter(a => isHolidayStatus(a.status)).length;
-
   const monthIndex = new Date(`${month} 1, 2000`).getMonth();
-  const daysInMonthTotal = new Date(year, monthIndex + 1, 0).getDate();
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
 
-  // ── Mirror AttendanceTracker.getEmpMonthlySummary EXACTLY ──────────────────
-  // Use FULL month days — same as the attendance page display.
-  // This ensures payroll DAYS = attendance DAYS PAID always match.
-  const monthDaysToCount: string[] = [];
-  for (let d = 1; d <= daysInMonthTotal; d++) {
-    monthDaysToCount.push(`${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+  // ── READ DAYS PAID DIRECTLY FROM ATTENDANCE — same source as attendance page ──
+  // Build full-month day list (identical to AttendanceTracker monthDays)
+  const allMonthDays: string[] = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    allMonthDays.push(`${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
   }
 
-  // Track manually marked HOLIDAY records (same as AttendanceTracker)
+  // Track manual HOLIDAY records to avoid double-counting auto-holidays
   const manualHolidayDates = new Set(
-    monthDaysToCount.filter(date => empAttendance.some(r => r.date === date && isHolidayStatus(r.status)))
+    allMonthDays.filter(date => empAttendance.some(r => r.date === date && isHolidayStatus(r.status)))
   );
 
-  // Count holidays using IDENTICAL logic to AttendanceTracker.getEmpMonthlySummary
-  let autoHolidays = 0;
-  monthDaysToCount.forEach(date => {
+  // Count exactly as AttendanceTracker.getEmpMonthlySummary does
+  let daysPresent = 0;
+  let halfDays = 0;
+  let daysAbsent = 0;
+  let totalPaidHolidays = 0;
+
+  allMonthDays.forEach(date => {
     const r = empAttendance.find(a => a.date === date);
     const dateObj = new Date(date);
     const isSun = dateObj.getDay() === 0;
     const hol = holidays.find(h => h.date === date && h.type === 'Full');
     const isBeforeJoining = joinDay ? dateObj < joinDay : false;
     if (isBeforeJoining) return;
-    if (!r) {
+
+    if (r) {
+      if (isHalfDayStatus(r.status)) halfDays++;
+      else if (isPresentStatus(r.status)) daysPresent++;
+      else if (isAbsentStatus(r.status)) daysAbsent++;
+      else if (isHolidayStatus(r.status)) totalPaidHolidays++;
+    } else {
       const coveredByGlobalHoliday = hol && !manualHolidayDates.has(date);
       const isSundayOff = isSun && !hol;
-      if (coveredByGlobalHoliday || isSundayOff) autoHolidays++;
+      if (coveredByGlobalHoliday || isSundayOff) totalPaidHolidays++;
     }
   });
 
-  const totalPaidHolidays = manualHolidays + autoHolidays;
   const totalOvertimeHours = empAttendance.reduce((acc, curr) => acc + (Number(curr.overtimeHours) || 0), 0);
-  const totalLateMinutes = empAttendance.reduce((acc, curr) => acc + (Number(curr.lateMinutes) || 0), 0);
-
-  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const totalLateMinutes   = empAttendance.reduce((acc, curr) => acc + (Number(curr.lateMinutes) || 0), 0);
 
   const monthlySal = Number(employee.monthlySalary || (employee as any).salary || 0) || 0;
   const dailyWage  = Number(employee.dailyWage || 0) || 0;
