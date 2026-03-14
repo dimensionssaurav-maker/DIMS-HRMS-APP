@@ -47,8 +47,16 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
     // Safety check for invalid dates
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return [];
 
+    // Deduplicate attendance records: keep only one record per employeeId+date
+    // (duplicates exist in Firebase due to old always-addData bug)
+    const deduped = new Map<string, typeof attendanceRecords[0]>();
+    for (const r of attendanceRecords) {
+      deduped.set(`${r.employeeId}-${r.date}`, r);
+    }
+    const uniqueRecords = Array.from(deduped.values());
+
     // 1. Filter Records by Date Range
-    const recordsInPeriod = attendanceRecords.filter(r => {
+    const recordsInPeriod = uniqueRecords.filter(r => {
       const d = new Date(r.date);
       return d >= start && d <= end && r.overtimeHours > 0;
     });
