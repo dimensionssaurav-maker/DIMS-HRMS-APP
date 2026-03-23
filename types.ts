@@ -1,210 +1,66 @@
-export { AttendanceStatus } from './enums';
+// ─── ADD THESE NEW INTERFACES TO types.ts ───────────────────────────────────
+// Place these alongside the existing OTRule interface
 
-export { ExpenseCategory } from './enums';
-
-export { LoanType } from './enums';
-
-export { ClaimStatus } from './enums';
-
-export { LeaveType } from './enums';
-
-export { LeaveStatus } from './enums';
-
-export interface DeductionRule {
+/**
+ * A single time-based OT slab (e.g. Normal OT, Half Night, Full Night)
+ * These are stored inside the Shift object so each shift can have its own slabs.
+ */
+export interface OTSlab {
   id: string;
-  department?: string;      // Optional, defaults to 'All Departments'
-  thresholdMinutes: number; // Slab FROM: late/early more than this many minutes
-  maxMinutes?: number;      // Slab TO: late/early up to this many minutes (undefined = no upper limit)
-  deductionAmount: number;  // Deduction in salary-hours
-  exemptionsCount?: number; // Times exempted per month before deduction applies
+  name: string;           // e.g. "Normal OT", "Half Night OT", "Full Night OT"
+  startTime: string;      // "HH:mm" — 24hr format. Cross-midnight slabs use "00:00" for midnight
+  endTime: string;        // "HH:mm"
+  multiplier: number;     // Pay rate multiplier e.g. 1.5, 2.0, 2.5
+  crossesMidnight: boolean; // true if this slab spans past midnight
   enabled: boolean;
 }
 
-export interface OTRule {
-  id: string;
-  department: string; // 'All Departments' or specific
-  thresholdMinutes: number; // If OT > this
-  payoutAmount: number;     // Pay this many hours
-  enabled: boolean;
-}
-
-export interface PayrollConfig {
-  globalOtMultiplier: number;
-  designationOverrides: Record<string, number>;
-  foodingConfig: {
-    enabled: boolean;
-    minHours: number;
-    amount: number;
-    departmentOverrides: Record<string, { minHours: number; amount: number }>;
-  };
-  attendanceConfig?: {
-    lateRules: DeductionRule[];
-    earlyExitRules: DeductionRule[];
-  };
-  otConfig?: {
-    enabled: boolean;
-    rules: OTRule[];
-  };
-  recruitmentConfig?: {
-    sources: string[];
-    serviceChargeRates: number[];
-  };
-}
-
-export interface Employee {
-  id: string;
-  name: string;
-  designation: string;
-  department: string;
-  joiningDate: string;
-  isOtAllowed: boolean;
-  // Status
-  status: 'Active' | 'Left' | 'Deleted';
-  leavingDate?: string;
-  // Salary Config
-  salaryType: 'Daily' | 'Monthly';
-  dailyWage: number; // Used if type is Daily
-  monthlySalary: number; // Used if type is Monthly
-  monthlyBase: number; // Calculated base for sorting/display
-  // Shift Config
-  shiftId?: string;
-  // Hiring Config
-  source?: string;
-  serviceChargeRate?: number;
-  // Profile
-  avatar?: string;
-}
-
-export interface SystemUser {
-  id: string;
-  name: string;
-  email: string;
-  role: 'Admin' | 'HR' | 'Manager' | 'Employee';
-  status: 'Active' | 'Inactive';
-  lastLogin: string;
-  isLocked?: boolean;
-  password?: string; // hashed or plain for demo
-  employeeId?: string; // linked employee record (for Employee role)
-}
-
-export interface Loan {
-  id: string;
-  employeeId: string;
-  amount: number;
-  type: LoanType;
-  issueDate: string;
-  tenureMonths: number;
-  description?: string;
-}
-
-export interface AttendanceRecord {
-  employeeId: string;
-  date: string;
-  status: AttendanceStatus;
-  overtimeHours: number;
-  checkIn?: string; // Format "HH:mm"
-  checkOut?: string; // Format "HH:mm"
-  lateMinutes?: number;
-  earlyMinutes?: number;
-}
-
-export interface Holiday {
-  id: string;
-  date: string;
-  name: string;
-  type: 'Full' | 'Short';
-  shortDayEndTime?: string; // e.g. "16:00"
-}
-
-export interface PayrollCalculation {
-  employeeId: string;
-  month: string;
-  year: number;
-  daysPresent: number;
-  daysAbsent: number;
-  holidays: number;
-  totalOvertimeHours: number;
-  totalLateMinutes: number;
-  grossSalary: number;
-  basicSalary: number;
-  overtimePay: number;
-  foodingAllowance: number;
-  expenseReimbursement: number;
-  esicEmployeeShare: number;
-  esicEmployerShare: number;
-  lwfEmployeeShare: number;
-  lwfEmployerShare: number;
-  serviceCharge: number;
-  loanDeduction: number;
-  lateDeduction: number;
-  earlyDeduction: number;
-  lateCount: number;
-  earlyCount: number;
-  lateHours: number;
-  earlyHours: number;
-  netPayable: number;
-}
-
-export interface Expense {
-  id: string;
-  amount: number;
-  category: ExpenseCategory;
-  date: string;
-  description: string;
-  hasReceipt?: boolean;
-}
-
-export interface ExpenseClaim {
-  id: string;
-  employeeId: string;
-  title: string;
-  description?: string;
-  amount: number;
-  date: string;
-  status: ClaimStatus;
-  itemsCount: number;
-  location: string;
-  branch?: string;
-  submittedDate: string;
-}
-
+// ─── EXTEND THE EXISTING Shift interface ───────────────────────────────────
+// Add this optional field to the existing Shift interface in types.ts:
+//
+//   otSlabs?: OTSlab[];   // Time-based OT slabs for this shift
+//
+// The full updated Shift interface should look like:
+/*
 export interface Shift {
   id: string;
   name: string;
   site: string;
-  startTime: string; // Format "HH:mm"
-  endTime: string;   // Format "HH:mm"
+  startTime: string;
+  endTime: string;
   workingHours: number;
   gracePeriodMinutes: number;
   breakDurationMinutes: number;
   overtimeThresholdHours: number;
   isNightShift: boolean;
+  otSlabs?: OTSlab[];    // ← NEW: time-based OT slabs
   sundaySchedule?: {
-    enabled: boolean; // Is Sunday a working day?
+    enabled: boolean;
     startTime: string;
     endTime: string;
-    isFullDayOvertime: boolean; // If true, all work hours count as OT
+    isFullDayOvertime: boolean;
   };
 }
+*/
 
-export interface LeaveRequest {
-  id: string;
-  employeeId: string;
-  startDate: string;
-  endDate: string;
-  days: number;
-  type: LeaveType;
-  reason: string;
-  status: LeaveStatus;
-  appliedOn: string;
+// ─── ADD TO AttendanceRecord interface ────────────────────────────────────
+// Add this optional field to AttendanceRecord in types.ts:
+//
+//   otSlabBreakdown?: OTSlabResult[];  // Per-slab breakdown for this day
+//
+export interface OTSlabResult {
+  slabName: string;
+  minutes: number;
+  hours: number;
+  multiplier: number;
+  amount: number;
 }
 
-export interface MonthlyReport {
-  month: string;
-  year: number;
-  totalPayout: number;
-  totalEmployees: number;
-  avgAttendance: number;
-  totalOvertime: number;
-  departmentBreakdown?: Record<string, number>;
-}
+// ─── ADD TO PayrollCalculation interface ──────────────────────────────────
+// Add this optional field to PayrollCalculation in types.ts:
+//
+//   overtimeSlabBreakdown?: {
+//     slabName: string;
+//     totalHours: number;
+//     totalAmount: number;
+//   }[];
