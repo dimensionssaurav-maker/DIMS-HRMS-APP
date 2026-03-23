@@ -1,0 +1,221 @@
+/**
+ * otSlabCalculator.ts
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Tiered time-based OT slab engine for DIMS HRMS.
+ *
+ * FACTORY DIMS shift example:
+ *   09:00 – 17:30  →  Day (regular pay, 1x)
+ *   17:30 – 21:00  →  Normal OT (1.5x)
+ *   21:00 – 00:00  →  Half Night OT (2x)
+ *   00:00 – 06:00  →  Full Night OT (2.5x)
+ *
+ * Drop this file into: utils/otSlabCalculator.ts
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+export interface OTSlab {
+  id: string;
+  name: string;
+  startTime: string;       // "HH:mm" 24-hr
+  endTime: string;         // "HH:mm" 24-hr
+  multiplier: number;      // pay rate multiplier
+  crossesMidnight: boolean;
+  enabled: boolean;
+}
+
+export interface OTSlabResult {
+  slabName: string;
+  minutes: number;
+  hours: number;           // rounded to 2dp
+  multiplier: number;
+  amount: number;          // ₹ amount for this slab
+}
+
+/** Convert "HH:mm" to total minutes from midnight (0–1439) */
+function toMins(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+/**
+ * Calculates how many minutes an employee spent inside each OT slab,
+ * and the ₹ pay for each slab.
+ *
+ * @param checkIn   "HH:mm" — employee punch-in (usually shift start)
+ * @param checkOut  "HH:mm" — employee punch-out
+ * @param shiftEnd  "HH:mm" — official shift end (OT starts after this)
+ * @param slabs     Configured OT slabs for this shift
+ * @param hourlyBase ₹ per hour at 1x rate (dailyWage / workingHours)
+ */
+export function calculateOTSlabs(
+  checkIn: string,
+  checkOut: string,
+  shiftEnd: string,
+  slabs: OTSlab[],
+  hourlyBase: number
+): OTSlabResult[] {
+  if (!checkIn || !checkOut || !slabs || slabs.length === 0) return [];
+
+  let pIn  = toMins(checkIn);
+  let pOut = toMins(checkOut);
+  const sEnd = toMins(shiftEnd);
+
+  // Handle cross-midnight punch-out
+  if (pOut <= pIn) pOut += 1440;
+
+  // OT only starts after official shift end
+  const otStart = Math.max(pIn, sEnd);
+  if (pOut <= otStart) return []; // No OT at all
+
+  const results: OTSlabResult[] = [];
+
+  for (const slab of slabs) {
+    if (!slab.enabled) continue;
+
+    let slabStart = toMins(slab.startTime);
+    let slabEnd   = toMins(slab.endTime);
+
+    // Handle midnight crossings: extend into +1440 space
+    if (slab.crossesMidnight || slabEnd <= slabStart) {
+      slabEnd += 1440;
+    }
+
+    // Also shift slab window if it starts before sEnd to avoid day-shift overlap
+    // e.g. a "Full Night" slab defined as 00:00–06:00 needs to be treated as 1440–1560
+    if (slabStart < sEnd && slabEnd < sEnd) continue; // slab is entirely before shift end
+    if (slabStart < sEnd) slabStart += (slabEnd > 1440 ? 0 : 1440); // push to next-day space if needed
+
+    const workedInSlab = Math.max(0, Math.min(pOut, slabEnd) - Math.max(otStart, slabStart));
+    if (workedInSlab <= 0) continue;
+
+    const hours  = Math.round((workedInSlab / 60) * 100) / 100;
+    const amount = Math.round(hours * hourlyBase * slab.multiplier);
+
+    results.push({
+      slabName:   slab.name,
+      minutes:    workedInSlab,
+      hours,
+      multiplier: slab.multiplier,
+      amount,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Simplified version: given just punch-out time and shift end,
+ * splits total OT minutes across slabs.
+ * Used in payroll calculations where we only have overtimeHours stored.
+ *
+ * Works by distributing overtimeHours starting from shiftEnd time forward
+ * across the slab windows.
+ */
+export function distributeOTAcrossSlabs(
+  overtimeHours: number,
+  shiftEnd: string,
+  slabs: OTSlab[],
+  hourlyBase: number
+): OTSlabResult[] {
+  if (!overtimeHours || overtimeHours <= 0 || !slabs?.length) return [];
+
+  let remaining = overtimeHours * 60; // total OT minutes to distribute
+  let cursor    = toMins(shiftEnd);   // starts at shift end, moves forward
+
+  const results: OTSlabResult[] = [];
+  const sorted  = [...slabs].filter(s => s.enabled).sort((a, b) => {
+    // Sort slabs by their start time so we fill them in chronological order
+    let as = toMins(a.startTime);
+    let bs = toMins(b.startTime);
+    // Handle midnight crossing: 00:00 should sort after 21:00 etc.
+    if (as < toMins(shiftEnd)) as += 1440;
+    if (bs < toMins(shiftEnd)) bs += 1440;
+    return as - bs;
+  });
+
+  for (const slab of sorted) {
+    if (remaining <= 0) break;
+
+    let slabStart = toMins(slab.startTime);
+    let slabEnd   = toMins(slab.endTime);
+
+    if (slab.crossesMidnight || slabEnd <= slabStart) slabEnd += 1440;
+    if (slabStart < toMins(shiftEnd)) slabStart += 1440;
+
+    const slabAvail = Math.max(0, slabEnd - Math.max(cursor, slabStart));
+    const used      = Math.min(remaining, slabAvail);
+    if (used <= 0) continue;
+
+    cursor    = Math.max(cursor, slabStart) + used;
+    remaining -= used;
+
+    const hours  = Math.round((used / 60) * 100) / 100;
+    const amount = Math.round(hours * hourlyBase * slab.multiplier);
+
+    results.push({
+      slabName:   slab.name,
+      minutes:    used,
+      hours,
+      multiplier: slab.multiplier,
+      amount,
+    });
+  }
+
+  // Any remaining OT (beyond all defined slabs) uses last slab's multiplier or 1x
+  if (remaining > 0) {
+    const lastSlab   = sorted[sorted.length - 1];
+    const multiplier = lastSlab?.multiplier ?? 1;
+    const hours      = Math.round((remaining / 60) * 100) / 100;
+    const amount     = Math.round(hours * hourlyBase * multiplier);
+    results.push({
+      slabName:   lastSlab ? `${lastSlab.name} (ext.)` : 'OT',
+      minutes:    remaining,
+      hours,
+      multiplier,
+      amount,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Sum all slab amounts to get total OT pay for a day.
+ */
+export function totalOTPayFromSlabs(slabResults: OTSlabResult[]): number {
+  return slabResults.reduce((sum, s) => sum + s.amount, 0);
+}
+
+/**
+ * Default OT slabs for FACTORY DIMS shift (09:00–17:30)
+ * Ready to use as the default value in ShiftManagement form.
+ */
+export const FACTORY_DIMS_DEFAULT_SLABS: OTSlab[] = [
+  {
+    id: 'slab-normal-ot',
+    name: 'Normal OT',
+    startTime: '17:30',
+    endTime: '21:00',
+    multiplier: 1.5,
+    crossesMidnight: false,
+    enabled: true,
+  },
+  {
+    id: 'slab-half-night',
+    name: 'Half Night OT',
+    startTime: '21:00',
+    endTime: '00:00',
+    multiplier: 2.0,
+    crossesMidnight: true,
+    enabled: true,
+  },
+  {
+    id: 'slab-full-night',
+    name: 'Full Night OT',
+    startTime: '00:00',
+    endTime: '06:00',
+    multiplier: 2.5,
+    crossesMidnight: false,
+    enabled: true,
+  },
+];
