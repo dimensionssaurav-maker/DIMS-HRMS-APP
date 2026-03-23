@@ -628,7 +628,7 @@ export default function App() {
         return (
           <OvertimeModule
             employees={employees.filter(e => e.status === 'Active')} attendanceRecords={attendanceRecords}
-            departments={departments} startDate={otStartDate} endDate={otEndDate}
+            departments={departments} shifts={shifts} startDate={otStartDate} endDate={otEndDate}
             onDateChange={(s, e) => { setOtStartDate(s); setOtEndDate(e); }} payrollConfig={payrollConfig}
           />
         );
