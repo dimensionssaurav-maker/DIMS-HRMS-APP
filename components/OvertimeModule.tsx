@@ -5,7 +5,7 @@ import {
 import { 
   Clock, Filter, Download, IndianRupee, TrendingUp, Search,
   Loader2, Calendar, AlertTriangle, User, AlertCircle,
-  Layers, ChevronDown, ChevronUp, Moon, Sun, Zap
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { Employee, AttendanceRecord, PayrollConfig, Shift } from '../types';
 
@@ -80,10 +80,10 @@ const SLAB_COLOURS: Record<string, { bg: string; text: string }> = {
 };
 function slabColour(name: string) { return SLAB_COLOURS[name] ?? { bg: 'bg-indigo-100', text: 'text-indigo-800' }; }
 function slabIcon(name: string) {
-  if (name.toLowerCase().includes('full night'))  return <Moon size={10} className="inline mr-0.5" />;
-  if (name.toLowerCase().includes('half night'))  return <Moon size={10} className="inline mr-0.5 opacity-60" />;
-  if (name.toLowerCase().includes('normal'))      return <Zap  size={10} className="inline mr-0.5" />;
-  return <Sun size={10} className="inline mr-0.5" />;
+  if (name.toLowerCase().includes('full night'))  return <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="inline mr-0.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>;
+  if (name.toLowerCase().includes('half night'))  return <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="inline mr-0.5 opacity-60"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>;
+  if (name.toLowerCase().includes('normal'))      return <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="inline mr-0.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
+  return <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="inline mr-0.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>;
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -291,7 +291,7 @@ const OvertimeModule: React.FC<Props> = ({
       {/* Slab Summary */}
       {slabSummary.length > 0 && (
         <div>
-          <div className="flex items-center gap-2 mb-3"><Layers size={16} className="text-indigo-600"/><h4 className="font-bold text-slate-700 text-sm uppercase tracking-wide">OT Slab Breakdown — Period Total</h4></div>
+          <div className="flex items-center gap-2 mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-indigo-600"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg><h4 className="font-bold text-slate-700 text-sm uppercase tracking-wide">OT Slab Breakdown — Period Total</h4></div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {slabSummary.map(s => {
               const c = slabColour(s.name);
