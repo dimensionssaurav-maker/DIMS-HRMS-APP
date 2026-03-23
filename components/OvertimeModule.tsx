@@ -104,11 +104,19 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
     });
   }, [attendanceRecords, employees, shifts, startDate, endDate, departmentFilter, employeeSearch, payrollConfig]);
 
-  const stats = useMemo(() => filteredData.reduce((acc, curr) => ({
-    totalHours: acc.totalHours + curr.overtimeHours, totalPayableHours: acc.totalPayableHours + curr.payableHours,
-    totalOtCost: acc.totalOtCost + curr.otAmount, totalFoodingCost: acc.totalFoodingCost + curr.foodingAmount,
-    totalCost: acc.totalCost + curr.totalCost, uniqueEmployees: new Set([...Array.from(acc.uniqueEmployees as Set<string>), curr.employeeId]).size,
-  }), { totalHours: 0, totalPayableHours: 0, totalOtCost: 0, totalFoodingCost: 0, totalCost: 0, uniqueEmployees: new Set<string>() as any }), [filteredData]);
+  const stats = useMemo(() => {
+        const empSet = new Set<string>();
+        let totalHours = 0, totalPayableHours = 0, totalOtCost = 0, totalFoodingCost = 0, totalCost = 0;
+        filteredData.forEach(curr => {
+                totalHours += curr.overtimeHours;
+                totalPayableHours += curr.payableHours;
+                totalOtCost += curr.otAmount;
+                totalFoodingCost += curr.foodingAmount;
+                totalCost += curr.totalCost;
+                empSet.add(curr.employeeId);
+        });
+        return { totalHours, totalPayableHours, totalOtCost, totalFoodingCost, totalCost, uniqueEmployees: empSet.size };
+  }, [filteredData]);
 
   const slabSummary = useMemo(() => {
     const map = new Map<string, { hours: number; amount: number; multiplier: number }>();
