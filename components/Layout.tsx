@@ -27,7 +27,8 @@ import {
   Banknote,
   Landmark,
   Settings,
-  Trash2
+  Trash2,
+  Fingerprint
 } from 'lucide-react';
 
 interface LayoutProps {
