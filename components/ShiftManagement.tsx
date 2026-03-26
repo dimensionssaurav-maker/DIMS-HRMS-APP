@@ -507,7 +507,11 @@ const ShiftManagement: React.FC<Props> = ({ shifts, onAdd, onUpdate, onDelete })
                     )}
                  </div>
 
-                 <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
+                 <OTSlabEditor
+                slabs={((formData.otSlabs as OTSlab[]) || DEFAULT_OT_SLABS)}
+                onChange={(slabs) => setFormData(prev => ({ ...prev, otSlabs: slabs }))}
+              />
+              <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
                     <button 
                        type="button"
                        onClick={() => setFormData({...formData, isNightShift: !formData.isNightShift})}
