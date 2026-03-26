@@ -105,17 +105,15 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
   }, [attendanceRecords, employees, shifts, startDate, endDate, departmentFilter, employeeSearch, payrollConfig]);
 
   const stats = useMemo(() => {
-        const empSet = new Set<string>();
-        let totalHours = 0, totalPayableHours = 0, totalOtCost = 0, totalFoodingCost = 0, totalCost = 0;
-        filteredData.forEach(curr => {
-                totalHours += curr.overtimeHours;
-                totalPayableHours += curr.payableHours;
-                totalOtCost += curr.otAmount;
-                totalFoodingCost += curr.foodingAmount;
-                totalCost += curr.totalCost;
-                empSet.add(curr.employeeId);
-        });
-        return { totalHours, totalPayableHours, totalOtCost, totalFoodingCost, totalCost, uniqueEmployees: empSet.size };
+    const empIds: Record<string, boolean> = {};
+    let totalHours = 0, totalPayableHours = 0, totalOtCost = 0, totalFoodingCost = 0, totalCost = 0;
+    for (let i = 0; i < filteredData.length; i++) {
+      const curr = filteredData[i];
+      totalHours += curr.overtimeHours; totalPayableHours += curr.payableHours;
+      totalOtCost += curr.otAmount; totalFoodingCost += curr.foodingAmount; totalCost += curr.totalCost;
+      empIds[curr.employeeId] = true;
+    }
+    return { totalHours, totalPayableHours, totalOtCost, totalFoodingCost, totalCost, uniqueEmployees: Object.keys(empIds).length };
   }, [filteredData]);
 
   const slabSummary = useMemo(() => {
@@ -130,20 +128,20 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
       if (!map.has(d.employeeId)) map.set(d.employeeId, { id: d.employeeId, name: d.employeeName, department: d.department, hours: 0, cost: 0, designation: d.designation });
       const e = map.get(d.employeeId)!; e.hours += d.overtimeHours; e.cost += d.totalCost;
     });
-    return Array.from(map.values()).sort((a, b) => b.hours - a.hours);
+    return Object.values(map).sort((a: any, b: any) => b.hours - a.hours);
   }, [filteredData]);
 
-  const maxTotalHours = useMemo(() => Math.max(...employeeStats.map(e => e.hours), 1), [employeeStats]);
-  const maxDailyHours = useMemo(() => Math.max(...filteredData.map(d => d.overtimeHours), 1), [filteredData]);
+  const maxTotalHours = useMemo(() => employeeStats.reduce((m, e) => e.hours > m ? e.hours : m, 1), [employeeStats]);
+  const maxDailyHours = useMemo(() => filteredData.reduce((m, d) => d.overtimeHours > m ? d.overtimeHours : m, 1), [filteredData]);
   const chartData = useMemo(() => {
     const m = new Map(); filteredData.forEach(d => m.set(d.department, (m.get(d.department) || 0) + d.overtimeHours));
-    return Array.from(m.entries()).map(([name, value]) => ({ name, value }));
+    return Object.keys(m).map(name => ({ name, value: m[name] }));
   }, [filteredData]);
 
   const handleExport = (type: 'csv' | 'monthly') => {
     setIsExporting(type);
     setTimeout(() => {
-      const allSlabNames = Array.from(new Set(filteredData.flatMap(d => d.slabBreakdown.map((s: OTSlabResult) => s.slabName))));
+      const snMap: Record<string,boolean> = {}; filteredData.forEach(d => (d.slabBreakdown as OTSlabResult[]).forEach(s => { snMap[s.slabName] = true; })); const allSlabNames = Object.keys(snMap);
       if (type === 'csv') {
         const headers = ['Date','Emp ID','Name','Department','Actual OT Hrs','OT Pay','Fooding','Total',...allSlabNames.flatMap(s => [s+' Hrs',s+' Pay'])];
         const rows = filteredData.map((d: any) => { const sc = allSlabNames.flatMap(sn => { const sl = d.slabBreakdown.find((s: OTSlabResult) => s.slabName === sn); return [sl?.hours??0,sl?.amount??0]; }); return [d.date,d.employeeId,'"'+d.employeeName+'"','"'+d.department+'"',d.overtimeHours,d.otAmount,d.foodingAmount,d.totalCost,...sc]; });
