@@ -49,9 +49,14 @@ function generateDemoPunches(employees: any[], fromDate: string, toDate: string)
   const start = new Date(fromDate);
   const end = new Date(toDate);
   const days: string[] = [];
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+  for (let d = new Date(start.getTime()); d <= end; d.setDate(d.getDate() + 1)) {
     const day = d.getDay();
-    if (day !== 0) days.push(new Date(d).toISOString().split('T')[0]);
+    if (day !== 0) {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd2 = String(d.getDate()).padStart(2, '0');
+      days.push(yyyy + '-' + mm + '-' + dd2);
+    }
   }
   const variants = [
     { in: '08:58', out: '18:02' }, { in: '09:03', out: '18:15' },
@@ -119,7 +124,9 @@ const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced }) => {
       } catch (e: any) {
         if (e.name === 'AbortError') addLog('Device at ' + config.ip + ' timed out.');
         else addLog('Direct connection blocked (browser CORS policy).');
-        addLog('Loading punch data from employee records...');
+        addLog('ℹ️ Browser security blocks direct LAN connections.');
+        addLog('Using simulated punch data based on your employees.');
+        addLog('For REAL machine data: install DIMS Bridge on your PC.');
       }
       setConnectionStatus('connected');
       await new Promise(r => setTimeout(r, 500));
