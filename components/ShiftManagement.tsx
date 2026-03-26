@@ -62,7 +62,7 @@ const OTSlabsFormSection = (
   <div className="pt-4 border-t border-slate-100">
     <div className="flex items-center justify-between mb-3">
       <div className="flex items-center gap-2">
-        <Layers size={16} className="text-indigo-600" />
+        <Clock size={16} className="text-indigo-600" />
         <h4 className="text-sm font-bold text-slate-700">OT Time Slabs</h4>
         <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Optional</span>
       </div>
