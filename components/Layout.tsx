@@ -92,6 +92,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, allo
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'employees', label: 'Employees', icon: Users },
     { id: 'attendance', label: 'Attendance', icon: CalendarCheck },
+    { id: 'biometric', label: 'Biometric Sync', icon: Fingerprint },
     { id: 'leaves', label: 'Leave Management', icon: CalendarDays },
     { id: 'shifts', label: 'Shift Management', icon: Clock },
     { id: 'overtime', label: 'Overtime', icon: Clock },
