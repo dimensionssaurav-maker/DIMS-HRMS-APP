@@ -23,6 +23,68 @@ const DEFAULT_OT_SLABS: OTSlab[] = [
   { id: 'slab2', name: 'Half Night OT', startTime: '21:00', endTime: '00:00', multiplier: 2.0, crossesMidnight: true, enabled: true },
   { id: 'slab3', name: 'Full Night OT', startTime: '00:00', endTime: '06:00', multiplier: 2.5, crossesMidnight: false, enabled: true },
 ];
+
+interface OTSlabEditorProps { slabs: OTSlab[]; onChange: (slabs: OTSlab[]) => void; }
+
+const OTSlabEditor: React.FC<OTSlabEditorProps> = ({ slabs, onChange }) => {
+  const update = (idx: number, field: keyof OTSlab, val: any) => {
+    const next = slabs.map((s, i) => i === idx ? { ...s, [field]: val } : s);
+    onChange(next);
+  };
+  const addSlab = () => {
+    const newSlab: OTSlab = { id: 'slab_' + Date.now(), name: 'New OT Slab', startTime: '21:00', endTime: '23:00', multiplier: 1.5, crossesMidnight: false, enabled: true };
+    onChange([...slabs, newSlab]);
+  };
+  const removeSlab = (idx: number) => onChange(slabs.filter((_, i) => i !== idx));
+  return (
+    <div className="mt-4 border border-indigo-100 rounded-xl p-4 bg-indigo-50/40">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Clock size={16} className="text-indigo-600" />
+          <h4 className="text-sm font-bold text-slate-700">OT Time Slabs</h4>
+          <span className="text-xs text-slate-400">(time-based multipliers after shift end)</span>
+        </div>
+        <button type="button" onClick={addSlab} className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 px-2 py-1 rounded-lg">
+          <Plus size={12}/> Add Slab
+        </button>
+      </div>
+      <div className="space-y-2">
+        {slabs.map((slab, idx) => (
+          <div key={slab.id} className={"rounded-lg p-3 border " + (slab.enabled ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100 opacity-60')}>
+            <div className="flex items-center gap-2 mb-2">
+              <input type="checkbox" checked={slab.enabled} onChange={e => update(idx, 'enabled', e.target.checked)} className="rounded" />
+              <input type="text" value={slab.name} onChange={e => update(idx, 'name', e.target.value)} className="flex-1 text-sm font-bold text-slate-700 border border-slate-200 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" placeholder="Slab Name"/>
+              <button type="button" onClick={() => removeSlab(idx)} className="text-red-400 hover:text-red-600 ml-auto">
+                <Trash2 size={14}/>
+              </button>
+            </div>
+            <div className="grid grid-cols-4 gap-2 text-xs">
+              <div>
+                <label className="text-slate-400 font-semibold block mb-0.5">Start Time</label>
+                <input type="time" value={slab.startTime} onChange={e => update(idx, 'startTime', e.target.value)} className="w-full border border-slate-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-xs"/>
+              </div>
+              <div>
+                <label className="text-slate-400 font-semibold block mb-0.5">End Time</label>
+                <input type="time" value={slab.endTime} onChange={e => update(idx, 'endTime', e.target.value)} className="w-full border border-slate-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-xs"/>
+              </div>
+              <div>
+                <label className="text-slate-400 font-semibold block mb-0.5">Multiplier (x)</label>
+                <input type="number" value={slab.multiplier} step="0.25" min="1" max="5" onChange={e => update(idx, 'multiplier', parseFloat(e.target.value))} className="w-full border border-slate-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-xs font-bold text-indigo-700"/>
+              </div>
+              <div className="flex flex-col justify-end pb-1">
+                <label className="flex items-center gap-1 text-slate-400 font-semibold cursor-pointer text-[10px]">
+                  <input type="checkbox" checked={slab.crossesMidnight} onChange={e => update(idx, 'crossesMidnight', e.target.checked)} className="rounded"/>
+                  Crosses Midnight
+                </label>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] text-slate-400 mt-2">OT hours are automatically split across these slabs in sequence after shift end time.</p>
+    </div>
+  );
+};
 interface Props {
   shifts: Shift[];
   onAdd: (shift: Shift) => void;
