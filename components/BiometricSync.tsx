@@ -10,6 +10,7 @@ import { addData } from '../services/firebaseService';
 interface Props {
   employees: any[];
   onAttendanceSynced: (records: any[]) => void;
+  onEmployeesSynced?: (employees: any[]) => void;
 }
 
 interface ParsedRecord {
@@ -83,7 +84,7 @@ function generateDemoPunches(employees: any[], fromDate: string, toDate: string)
   return records;
 }
 
-const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced }) => {
+const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced, onEmployeesSynced }) => {
   const [activeTab, setActiveTab] = useState<'live'|'upload'>('live');
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState('');
@@ -105,6 +106,87 @@ const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced }) => {
   });
 
   const addLog = (msg: string) => setFetchLog(prev => [...prev, '[' + new Date().toLocaleTimeString() + '] ' + msg]);
+
+  // ── Employee Import State ──────────────────────────────────────────────────
+  const [empStep, setEmpStep] = useState<'idle'|'uploading'|'preview'|'saving'|'done'>('idle');
+  const [empRecords, setEmpRecords] = useState<any[]>([]);
+  const [empSavedCount, setEmpSavedCount] = useState(0);
+  const [empError, setEmpError] = useState('');
+  const empFileRef = useRef<HTMLInputElement>(null);
+
+  const parseEmpCSV = (text: string) => {
+    const rows = parseCSV(text);
+    if (rows.length < 2) throw new Error('File is empty.');
+    const headers = rows[0].map((h: string) => h.replace(/['"]/g, '').trim());
+    const codeCol = detectCol(headers, ['emp code','empcode','employee code','code','userid','id','enrollment']);
+    const nameCol = detectCol(headers, ['emp name','empname','employee name','name','employee']);
+    const deptCol = detectCol(headers, ['department','dept','division']);
+    const desigCol = detectCol(headers, ['designation','role','position','title']);
+    const mobileCol = detectCol(headers, ['mobile','phone','contact','cell']);
+    if (codeCol === -1 && nameCol === -1) throw new Error('Cannot find Emp Code or Name column. Found: ' + headers.join(', '));
+    const parsed: any[] = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (row.every((c: string) => !c)) continue;
+      const empCode = codeCol !== -1 ? row[codeCol] || '' : String(i);
+      const empName = nameCol !== -1 ? row[nameCol] || '' : '';
+      if (!empCode && !empName) continue;
+      const existingEmp = employees.find(e =>
+        String(e.empCode || e.employeeCode || '').toLowerCase() === empCode.toLowerCase() ||
+        (empName && (e.name || '').toLowerCase().trim() === empName.toLowerCase().trim())
+      );
+      parsed.push({
+        empCode,
+        name: empName || 'Employee ' + empCode,
+        department: deptCol !== -1 ? row[deptCol] || '' : '',
+        designation: desigCol !== -1 ? row[desigCol] || '' : '',
+        phone: mobileCol !== -1 ? row[mobileCol] || '' : '',
+        alreadyExists: !!existingEmp,
+      });
+    }
+    return parsed;
+  };
+
+  const handleEmpFile = (file: File) => {
+    setEmpError('');
+    setEmpStep('uploading');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const records = parseEmpCSV(text);
+        if (records.length === 0) throw new Error('No employee records found.');
+        setEmpRecords(records);
+        setEmpStep('preview');
+      } catch (err: any) { setEmpError(err.message); setEmpStep('idle'); }
+    };
+    reader.readAsText(file);
+  };
+
+  const saveEmployees = async () => {
+    setEmpStep('saving');
+    const toSave = empRecords.filter(r => !r.alreadyExists);
+    const newEmps = toSave.map(r => ({
+      id: 'bio_' + r.empCode + '_' + Date.now(),
+      employeeCode: r.empCode,
+      empCode: r.empCode,
+      name: r.name,
+      department: r.department || 'General',
+      designation: r.designation || 'Worker',
+      phone: r.phone || '',
+      email: '',
+      status: 'Active',
+      joiningDate: new Date().toISOString().split('T')[0],
+      salary: 0, dailyWage: 0, isOtAllowed: true,
+      gender: 'Male', dob: '', address: '',
+      bankAccount: '', ifsc: '', bankName: '',
+      pan: '', aadhar: '', pfNumber: '', esiNumber: '',
+      emergencyContact: '',
+    }));
+    if (onEmployeesSynced) onEmployeesSynced(newEmps);
+    setEmpSavedCount(newEmps.length);
+    setEmpStep('done');
+  };
 
   const handleLiveFetch = async () => {
     setFetchStatus('fetching');
@@ -249,6 +331,9 @@ const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced }) => {
           <button onClick={() => setActiveTab('upload')} className={"flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all " + (activeTab === 'upload' ? 'bg-white shadow text-indigo-700' : 'text-slate-500')}>
             <Upload size={16} /> Upload CSV / Excel
           </button>
+          <button onClick={() => setActiveTab('employees')} className={"flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all " + (activeTab === 'employees' ? 'bg-white shadow text-emerald-700' : 'text-slate-500')}>
+            <Users size={16} /> Import Employees
+          </button>
         </div>
       )}
 
@@ -323,6 +408,137 @@ const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced }) => {
             <p className="font-bold mb-1">How biometric sync works</p>
             <p>DIMS connects to your ZKTeco/eSSL device on your local network. Punch records are fetched for all employees and matched to DIMS profiles automatically. For real-time TCP connection, install the <strong>DIMS Bridge</strong> desktop agent on any PC on the same network as the device.</p>
           </div>
+        </div>
+      )}
+
+      {step === 'upload' && activeTab === 'employees' && (
+        <div className="space-y-4">
+          {/* How it works */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+            <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
+              <Users size={16} className="text-emerald-600"/> Import Employees from Biometric Machine
+            </h3>
+            <div className="grid grid-cols-1 gap-3 mb-5">
+              {[
+                { step:'1', color:'bg-indigo-500', title:'Export from eTimeOffice', desc:'Go to Master → Employee Master → Export as CSV' },
+                { step:'2', color:'bg-emerald-500', title:'Upload the CSV here', desc:'The file should have Emp Code, Name, Department, Designation' },
+                { step:'3', color:'bg-violet-500', title:'Review & Import', desc:'DIMS will create employee profiles. You can edit details later in Employee Management.' },
+              ].map(s => (
+                <div key={s.step} className="flex items-start gap-3">
+                  <div className={s.color + " text-white w-7 h-7 rounded-full flex items-center justify-center font-black text-sm shrink-0"}>{s.step}</div>
+                  <div><p className="font-bold text-slate-700 text-sm">{s.title}</p><p className="text-slate-400 text-xs mt-0.5">{s.desc}</p></div>
+                </div>
+              ))}
+            </div>
+
+            {/* Already synced count */}
+            {employees.length > 0 && (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 mb-4 flex items-center gap-3">
+                <Users size={18} className="text-indigo-600 shrink-0"/>
+                <div>
+                  <p className="font-bold text-indigo-700 text-sm">{employees.length} employees already in DIMS</p>
+                  <p className="text-indigo-500 text-xs">Only new employees (not already in DIMS) will be imported.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Upload zone */}
+            {empStep === 'idle' && (
+              <div
+                onClick={() => empFileRef.current?.click()}
+                className="border-2 border-dashed border-slateald-200 hover:border-emerald-400 bg-slate-50 hover:bg-emerald-50 rounded-2xl p-8 text-center cursor-pointer transition-all"
+              >
+                <div className="flex justify-center mb-3"><div className="p-3 bg-emerald-100 rounded-xl"><Users size={28} className="text-emerald-600"/></div></div>
+                <p className="font-black text-slate-700">Upload Employee CSV from eTimeOffice</p>
+                <p className="text-slate-400 text-sm mt-1">Emp Code, Name, Department, Designation, Mobile</p>
+              </div>
+            )}
+            <input ref={empFileRef} type="file" accept=".csv,.xlsx,.xls,.txt" onChange={e => { const f = e.target.files?.[0]; if (f) handleEmpFile(f); }} className="hidden"/>
+            {empError && <div className="mt-3 bg-red-50 border border-red-100 rounded-xl p-3 text-red-600 text-sm">{empError}</div>}
+
+            {/* Sample format */}
+            {empStep === 'idle' && (
+              <div className="mt-4 bg-slate-50 rounded-xl p-4">
+                <p className="text-xs font-bold text-slate-500 uppercase mb-2">Expected CSV Format</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs font-mono">
+                    <thead><tr className="text-indigo-600">{['Emp Code','Emp Name','Department','Designation','Mobile'].map(h=><th key={h} className="text-left px-2 py-1 bg-indigo-50">{h}</th>)}</tr></thead>
+                    <tbody className="text-slate-500">
+                      <tr>{['0135','Saurav Sharma','Production','Supervisor','9876543210'].map((v,i)=><td key={i} className="px-2 py-1 border-b border-slate-100">{v}</td>)}</tr>
+                      <tr>{['0475','Rameshwar Sahu','Operations','Worker','9876543211'].map((v,i)=><td key={i} className="px-2 py-1">{v}</td>)}</tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Preview Step */}
+          {empStep === 'preview' && (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-slate-700">Employee Preview</h3>
+                <button onClick={() => setEmpStep('idle')} className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1"><Trash2 size={12}/> Change file</button>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-slate-50 rounded-xl p-3 text-center"><p className="font-black text-xl text-slate-700">{empRecords.length}</p><p className="text-slate-400 text-xs">Total in File</p></div>
+                <div className="bg-emerald-50 rounded-xl p-3 text-center"><p className="font-black text-xl text-emerald-700">{empRecords.filter(r=>!r.alreadyExists).length}</p><p className="text-emerald-500 text-xs">✅ Will be imported</p></div>
+                <div className="bg-amber-50 rounded-xl p-3 text-center"><p className="font-black text-xl text-amber-700">{empRecords.filter(r=>r.alreadyExists).length}</p><p className="text-amber-500 text-xs">⚠️ Already in DIMS</p></div>
+              </div>
+              <div className="overflow-x-auto max-h-64 overflow-y-auto rounded-xl border border-slate-100">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 sticky top-0">
+                    <tr>{['','Code','Name','Department','Designation','Status'].map(h=><th key={h} className="text-left px-3 py-2.5 font-bold text-slate-500 text-[10px] uppercase">{h}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {empRecords.map((r,i)=>(
+                      <tr key={i} className={"border-t border-slate-50 " + (r.alreadyExists ? 'opacity-50' : '')}>
+                        <td className="px-3 py-2">{r.alreadyExists ? <AlertCircle size={13} className="text-amber-400"/> : <CheckCircle2 size={13} className="text-emerald-500"/>}</td>
+                        <td className="px-3 py-2 font-mono text-slate-500">{r.empCode}</td>
+                        <td className="px-3 py-2 font-medium text-slate-700">{r.name}</td>
+                        <td className="px-3 py-2 text-slate-500">{r.department || '—'}</td>
+                        <td className="px-3 py-2 text-slate-500">{r.designation || '—'}</td>
+                        <td className="px-3 py-2"><span className={"px-2 py-0.5 rounded-full text-[10px] font-bold " + (r.alreadyExists ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700')}>{r.alreadyExists ? 'Already exists' : 'New'}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {empRecords.filter(r=>!r.alreadyExists).length === 0 ? (
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-sm text-amber-700 font-bold text-center">All employees are already in DIMS — nothing to import!</div>
+              ) : (
+                <div className="flex gap-3">
+                  <button onClick={() => setEmpStep('idle')} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl">← Back</button>
+                  <button onClick={saveEmployees} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm">
+                    <Users size={16}/> Import {empRecords.filter(r=>!r.alreadyExists).length} Employees
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Saving */}
+          {empStep === 'saving' && (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 text-center">
+              <RefreshCw size={32} className="animate-spin text-emerald-600 mx-auto mb-4"/>
+              <p className="font-bold text-slate-700">Importing employees to DIMS...</p>
+            </div>
+          )}
+
+          {/* Done */}
+          {empStep === 'done' && (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 text-center">
+              <div className="flex justify-center mb-4"><div className="p-4 bg-emerald-100 rounded-full"><CheckCircle2 size={40} className="text-emerald-600"/></div></div>
+              <h3 className="text-xl font-black text-slate-800 mb-2">Employees Imported! 🎉</h3>
+              <p className="text-slate-500 text-sm mb-6"><span className="font-black text-emerald-600 text-2xl">{empSavedCount}</span> new employees added to DIMS HRMS</p>
+              <div className="bg-slate-50 rounded-xl p-4 mb-6 text-left space-y-2">
+                <p className="text-xs text-slate-600">✅ Employees appear in Employee Management</p>
+                <p className="text-xs text-slate-600">✅ Future biometric syncs will match these employees</p>
+                <p className="text-xs text-slate-600">✅ Edit salary, bank details in Employee Management</p>
+              </div>
+              <button onClick={() => { setEmpStep('idle'); setEmpRecords([]); }} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl">Import More</button>
+            </div>
+          )}
         </div>
       )}
 
