@@ -1,21 +1,7 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# DIMS HRMS
 
-# Run and deploy your AI Studio app
+Factory HR Management System — ZenAI powered by Gemini 2.5 Flash
 
-This contains everything you need to run your app locally.
+Deployed at: https://dims-hrms-app-5nwe.vercel.app/
 
-View your app in AI Studio: https://ai.studio/apps/2e470487-0c67-42c7-afb1-3fa5cfb0f19d
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
- 
+Updated: 2026-03-27T13:25:14.954Z
