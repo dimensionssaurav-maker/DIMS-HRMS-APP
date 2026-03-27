@@ -1,94 +1,67 @@
+// ZenAI HR Assistant — Anthropic Claude API
+const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-
-/**
- * Utility to perform retries with exponential backoff for transient errors like 429.
- */
-async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
-  let lastError: any;
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await fn();
-    } catch (error: any) {
-      lastError = error;
-      
-      // Detailed check for 429 Resource Exhausted / Quota errors
-      const isRateLimit = 
-        error?.status === 429 || 
-        error?.code === 429 ||
-        error?.error?.code === 429 ||
-        error?.message?.includes('429') || 
-        error?.message?.includes('quota') ||
-        error?.message?.includes('RESOURCE_EXHAUSTED');
-      
-      if (isRateLimit) {
-        if (i < maxRetries - 1) {
-          // Exponential backoff with jitter: 2s, 4s, 8s...
-          const delay = Math.pow(2, i) * 2000 + Math.random() * 1000;
-          console.warn(`Rate limit hit (429). Retrying in ${Math.round(delay)}ms... (Attempt ${i + 1}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          continue;
-        }
-      }
-      throw error;
-    }
-  }
-  throw lastError;
-}
-
-export async function getHRInsights(data: any) {
+export async function getHRInsights(data: any): Promise<string> {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
-    // Using gemini-3-flash-preview for efficiency.
-    // Truncating data to ensure we don't accidentally send huge payloads causing other errors.
-    const response: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
-      model: 'gemini-3-flash-preview', 
-      contents: `Analyze this HR payroll/attendance summary. Identify 2 key trends (absenteeism/costs) and 2 quick actionable recommendations. Keep the total response under 100 words and strictly professional.
-      Data: ${JSON.stringify(data).substring(0, 15000)}`, 
-      config: {
-        temperature: 0.7,
-        topP: 0.95,
-        topK: 40,
-      }
-    }));
-
-    return response.text || "No insights available at this time.";
-  } catch (error: any) {
-    // Check specifically for rate limits to show a friendly message
-    const isRateLimit = 
-        error?.status === 429 || 
-        error?.code === 429 ||
-        error?.error?.code === 429 ||
-        error?.message?.includes('429') || 
-        error?.message?.includes('quota') ||
-        error?.message?.includes('RESOURCE_EXHAUSTED');
-
-    if (isRateLimit) {
-      return "⚠️ AI System Busy: High demand or quota limit reached. Please wait a moment and use the refresh button.";
-    }
-    
-    console.error("Gemini Insight Generation Error:", error);
-    return "Unable to generate insights. Please try again later.";
+    const resp = await fetch(ANTHROPIC_API, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 200,
+        system: 'You are ZenAI, an HR analytics assistant for DIMS HRMS. Give brief, data-driven insights in 2-3 bullet points under 100 words.',
+        messages: [{ role: 'user', content: 'Analyze this HR data and give 2 key trends + 2 recommendations under 100 words: ' + JSON.stringify(data).substring(0, 3000) }]
+      })
+    });
+    if (!resp.ok) throw new Error('API ' + resp.status);
+    const json = await resp.json();
+    return json.content?.[0]?.text || 'No insights available.';
+  } catch (err: any) {
+    console.error('ZenAI error:', err);
+    return '\u26a0\ufe0f AI insights temporarily unavailable.';
   }
 }
 
 export function createHRChat(context: any) {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  return ai.chats.create({
-    model: 'gemini-3-pro-preview',
-    config: {
-      systemInstruction: `You are ZenAI, a world-class HR Analytics Assistant for ZenHR.
-      You have access to the current HR data: ${JSON.stringify(context).substring(0, 20000)}.
-      
-      Your goal is to help administrators manage their workforce, analyze payroll, and track expenses.
-      - Be professional, concise, and data-driven.
-      - Use markdown for formatting tables or lists.
-      - If asked about specific employees, check the provided data.
-      - If asked about financial trends, use the payroll and expense records.
-      - If a question is outside the scope of HR or the provided data, politely redirect.
-      - If the user experiences errors, suggest they wait a few seconds as the system might be busy.`,
-      temperature: 0.7,
+  const history: Array<{role: string; content: string}> = [];
+  const sys = `You are ZenAI, expert HR assistant for DIMS HRMS (factory HR system).
+Live HR data: ${JSON.stringify(context).substring(0, 8000)}
+- Answer questions about employees, attendance, payroll, OT, leaves, loans, expenses
+- Use actual data to answer — never make up numbers  
+- Be concise, professional, data-driven
+- Format tables/lists with markdown
+- Keep responses under 250 words unless detailed analysis requested`;
+
+  return {
+    sendMessage: async ({ message }: { message: string }) => {
+      history.push({ role: 'user', content: message });
+      const resp = await fetch(ANTHROPIC_API, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 600,
+          system: sys,
+          messages: history.map(h => ({ role: h.role as 'user'|'assistant', content: h.content }))
+        })
+      });
+      if (!resp.ok) {
+        const errText = await resp.text();
+        throw new Error('ZenAI error ' + resp.status + ': ' + errText.substring(0, 100));
+      }
+      const json = await resp.json();
+      const reply = json.content?.[0]?.text || "I couldn't generate a response.";
+      history.push({ role: 'assistant', content: reply });
+      return { text: reply };
     },
-  });
+    clearHistory: () => { history.length = 0; }
+  };
 }
