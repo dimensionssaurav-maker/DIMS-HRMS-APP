@@ -1,5 +1,5 @@
-// ZenAI HR Assistant — Google Gemini API (gemini-2.0-flash)
-const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+// ZenAI HR Assistant — Google Gemini API (gemini-2.5-flash)
+const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 function getKey(): string {
   return (import.meta as any).env?.VITE_GEMINI_KEY || '';
@@ -51,7 +51,7 @@ export function createHRChat(context: any) {
         history.push({ role: 'model', parts: [{ text: reply }] });
         return { text: reply };
       } catch (err: any) {
-        history.pop(); // remove failed user message
+        history.pop();
         throw err;
       }
     },
