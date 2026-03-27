@@ -1,96 +1,76 @@
-// ZenAI HR Assistant — Anthropic Claude API
-const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
-const ANTHROPIC_KEY = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ANTHROPIC_KEY) || '';
+// ZenAI HR Assistant — Google Gemini API (gemini-1.5-flash)
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-function getHeaders() {
-  return {
-    'Content-Type': 'application/json',
-    'anthropic-version': '2023-06-01',
-    'anthropic-dangerous-direct-browser-access': 'true',
-    ...(ANTHROPIC_KEY ? { 'x-api-key': ANTHROPIC_KEY } : {}),
-  };
+function getKey(): string {
+  return (import.meta as any).env?.VITE_GEMINI_KEY || '';
 }
 
 export async function getHRInsights(data: any): Promise<string> {
+  const key = getKey();
+  if (!key) return '⚠️ ZenAI: API key not configured. Add VITE_GEMINI_KEY to Vercel environment variables.';
   try {
-    const resp = await fetch(ANTHROPIC_API, {
+    const resp = await fetch(GEMINI_API_BASE + '/gemini-1.5-flash:generateContent?key=' + key, {
       method: 'POST',
-      headers: getHeaders(),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 250,
-        system: 'You are ZenAI, an HR analytics assistant for DIMS HRMS (factory management system). Analyze the provided HR data and give exactly 2 key trends and 2 actionable recommendations. Format with bullet points. Keep total response under 120 words. Be specific with numbers from the data.',
-        messages: [{
-          role: 'user',
-          content: 'Analyze this DIMS HRMS data and provide insights: ' + JSON.stringify(data).substring(0, 4000)
-        }]
+        contents: [{
+          parts: [{
+            text: 'You are ZenAI, an HR analytics expert for DIMS HRMS (factory HR management system). Analyze this HR data and give exactly 2 key trends and 2 actionable recommendations. Use bullet points. Be concise, specific with numbers. Under 100 words total.\n\nData: ' + JSON.stringify(data).substring(0, 3000)
+          }]
+        }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 300 }
       })
     });
     if (!resp.ok) {
       const err = await resp.text();
-      console.error('ZenAI insights error:', resp.status, err.substring(0, 200));
-      if (resp.status === 401) return '🔑 ZenAI needs an API key. Add VITE_ANTHROPIC_KEY to Vercel environment variables.';
-      throw new Error('API ' + resp.status);
+      console.error('ZenAI insights error:', resp.status, err.substring(0, 100));
+      return '⚠️ AI insights unavailable. Error: ' + resp.status;
     }
     const json = await resp.json();
-    return json.content?.[0]?.text || 'No insights available.';
+    return json.candidates?.[0]?.content?.parts?.[0]?.text || 'No insights available.';
   } catch (err: any) {
     console.error('ZenAI error:', err);
-    return '⚠️ AI insights unavailable. Check your API key configuration.';
+    return '⚠️ AI insights temporarily unavailable.';
   }
 }
 
 export function createHRChat(context: any) {
-  const history: Array<{role: string; content: string}> = [];
-  const systemPrompt = `You are ZenAI, an expert HR assistant embedded in DIMS HRMS — a factory HR management system.
+  // Gemini uses a different chat format — we maintain history manually
+  const history: Array<{role: string; parts: Array<{text: string}>}> = [];
 
-You have access to this live HR data:
-${JSON.stringify(context).substring(0, 10000)}
-
-Your role:
-- Answer any question about employees, attendance, payroll, overtime, leaves, loans, expenses
-- Use the actual numbers from the data — never guess or make up figures
-- When asked about specific employees or departments, reference the data
-- Calculate totals, averages, comparisons on request
-- Give actionable HR recommendations based on data patterns
-- Format responses clearly using markdown when helpful
-- Keep answers concise (under 200 words) unless detailed analysis is requested
-
-You are helpful, professional, and data-driven.`;
+  const systemContext = 'You are ZenAI, an expert HR assistant embedded in DIMS HRMS (factory HR management system). You have access to this live HR data: ' + JSON.stringify(context).substring(0, 8000) + '. Answer questions about employees, attendance, payroll, overtime, leaves, loans, expenses. Use actual numbers from the data. Be concise, professional, data-driven. Format with markdown when helpful. Under 200 words unless detailed analysis needed.';
 
   return {
     sendMessage: async ({ message }: { message: string }) => {
-      history.push({ role: 'user', content: message });
+      const key = getKey();
+      if (!key) throw new Error('ZenAI: API key not configured. Add VITE_GEMINI_KEY to Vercel environment variables.');
 
-      const resp = await fetch(ANTHROPIC_API, {
+      // Add user message to history
+      history.push({ role: 'user', parts: [{ text: message }] });
+
+      const resp = await fetch(GEMINI_API_BASE + '/gemini-1.5-flash:generateContent?key=' + key, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 700,
-          system: systemPrompt,
-          messages: history.map(h => ({
-            role: h.role as 'user' | 'assistant',
-            content: h.content
-          }))
+          system_instruction: { parts: [{ text: systemContext }] },
+          contents: history,
+          generationConfig: { temperature: 0.7, maxOutputTokens: 700 }
         })
       });
 
       if (!resp.ok) {
         const errText = await resp.text();
         console.error('ZenAI chat error:', resp.status, errText.substring(0, 200));
-        if (resp.status === 401) {
-          throw new Error('ZenAI needs an API key. Please add VITE_ANTHROPIC_KEY to your Vercel environment variables, then redeploy.');
-        }
-        throw new Error('ZenAI API error ' + resp.status);
+        throw new Error('ZenAI API error ' + resp.status + '. Please try again.');
       }
 
       const json = await resp.json();
-      const reply = json.content?.[0]?.text || "I couldn't generate a response. Please try again.";
-      history.push({ role: 'assistant', content: reply });
+      const reply = json.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't generate a response. Please try again.";
+
+      // Add model response to history
+      history.push({ role: 'model', parts: [{ text: reply }] });
       return { text: reply };
     },
-
     clearHistory: () => { history.length = 0; }
   };
 }
