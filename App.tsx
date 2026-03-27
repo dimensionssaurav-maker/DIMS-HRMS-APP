@@ -599,7 +599,10 @@ export default function App() {
             <BiometricSync
               employees={employees}
               onAttendanceSynced={(records) => {
-                records.forEach(r => handleAttendanceUpdate(r));
+                records.forEach(rec => handleAttendanceUpdate(rec));
+              }}
+              onEmployeesSynced={async (newEmps) => {
+                await handleBulkAddEmployees(newEmps);
               }}
             />
           </div>
