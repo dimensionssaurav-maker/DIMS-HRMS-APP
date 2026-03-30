@@ -382,7 +382,7 @@ const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced, onEmplo
               </div>
             )}
             <input ref={empFileRef} type="file" accept=".csv,.xlsx,.xls,.txt" onChange={e => { const f = e.target.files?.[0]; if (f) handleEmpFile(f); }} className="hidden"/>
-            {empError && <div className="mt-3 bg-red-50 border border-red-100 rounded-xl p-3 text-red-600 text-sm">{empError}</div>}
+            {empCsvError && <div className="mt-3 bg-red-50 border border-red-100 rounded-xl p-3 text-red-600 text-sm">{empCsvError}</div>}
 
             {/* Sample format */}
             {empStep === 'idle' && (
