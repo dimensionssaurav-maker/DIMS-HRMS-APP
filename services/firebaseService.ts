@@ -1,9 +1,15 @@
 import { db } from "../firebase"
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from "firebase/firestore"
-
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, setDoc } from "firebase/firestore"
 export const addData = async (collectionName: string, data: any) => {
-  return await addDoc(collection(db, collectionName), data)
-}
+    const docId = data.empCode || data.id || data.employeeCode
+      if (docId) {
+            const ref = doc(db, collectionName, String(docId))
+                return await setDoc(ref, data, { merge: true })
+                  }
+                    return await addDoc(collection(db, collectionName), data)
+                    }
+      }
+}}
 
 export const getData = async (collectionName: string) => {
 

@@ -201,9 +201,12 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
     event.preventDefault();
     event.stopPropagation();
     setOpenActionId(null);
-    setEditingEmployee({ ...emp, salaryType: emp.salaryType || 'Daily', monthlySalary: emp.monthlySalary || (emp.dailyWage * 30) });
-    setEditTab('profile');
-  };
+      setTimeout(() => {
+            setEditingEmployee({ ...emp, salaryType: emp.salaryType || 'Daily', monthlySalary: emp.monthlySalary || (emp.dailyWage * 30) });
+                setEditTab('profile');
+                  }, 50);
+                  
+      })
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
