@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import LoginScreen from './components/LoginScreen.tsx';
+import LoginScreen from './components/LoginScreenS.tsx';
 import DataResetTool from './components/DataResetTool.tsx';
 
-import { addData, getData, updateData, deleteData } from "./services/firebaseService"
+import { addData, getData, updateData, deleteData } from "./services/firebaseServiceS"
 
 import Layout from './components/Layout.tsx';
 import Dashboard from './components/Dashboard.tsx';
