@@ -19,8 +19,41 @@ interface ParsedRecord {
   matched: boolean; matchedEmployee?: any;
 }
 
+interface EmpRecord {
+  empCode: string; name: string; department: string;
+  designation: string; mobile: string; alreadyExists: boolean;
+}
+
 interface BiometricConfig {
   ip: string; port: string; deviceType: string; commKey: string;
+  bridgeUrl: string;
+}
+
+// Normalize date strings coming from biometric exports (DD/MM/YYYY, DD-MM-YYYY, etc.) to YYYY-MM-DD
+function normalizeDate(input: string): string {
+  if (!input) return '';
+  const s = input.trim();
+  // Already ISO
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const parts = s.split(/[\/\-\.]/);
+  if (parts.length >= 3) {
+    let [a, b, c] = parts;
+    // Year-first?
+    if (a.length === 4) return `${a}-${b.padStart(2,'0')}-${c.padStart(2,'0')}`;
+    // Assume DD/MM/YYYY (Indian biometric default)
+    if (c.length === 2) c = '20' + c;
+    return `${c}-${b.padStart(2,'0')}-${a.padStart(2,'0')}`;
+  }
+  return s;
+}
+
+// Normalize punch time to HH:mm
+function normalizeTime(input: string): string {
+  if (!input) return '';
+  const s = input.trim();
+  const m = s.match(/(\d{1,2}):(\d{2})/);
+  if (!m) return '';
+  return `${m[1].padStart(2,'0')}:${m[2]}`;
 }
 
 function detectCol(headers: string[], candidates: string[]): number {
@@ -86,12 +119,9 @@ function generateDemoPunches(employees: any[], fromDate: string, toDate: string)
 
 const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced, onEmployeesSynced }) => {
   const [activeTab, setActiveTab] = useState<'live'|'upload'|'employees'>('live');
-  const [empStep, setEmpStep] = useState<'fetch'|'preview'|'done'>('fetch');
-  const [fetchedEmployees, setFetchedEmployees] = useState<any[]>([]);
-  const [empFetchLog, setEmpFetchLog] = useState<string[]>([]);
-  const [empFetching, setEmpFetching] = useState(false);
-  const [empImporting, setEmpImporting] = useState(false);
-  const [empImportedCount, setEmpImportedCount] = useState(0);
+  const [empStep, setEmpStep] = useState<'idle'|'preview'|'saving'|'done'>('idle');
+  const [empRecords, setEmpRecords] = useState<EmpRecord[]>([]);
+  const [empSavedCount, setEmpSavedCount] = useState(0);
   const [empCsvError, setEmpCsvError] = useState('');
   const empFileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -103,7 +133,7 @@ const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced, onEmplo
   const [step, setStep] = useState<'upload'|'preview'|'done'>('upload');
   const [totalSynced, setTotalSynced] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [config, setConfig] = useState<BiometricConfig>({ ip: '192.168.1.201', port: '4370', deviceType: 'ZKTeco', commKey: '0' });
+  const [config, setConfig] = useState<BiometricConfig>({ ip: '192.168.1.201', port: '4370', deviceType: 'ZKTeco', commKey: '0', bridgeUrl: 'http://localhost:8182' });
   const [showConfig, setShowConfig] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle'|'connecting'|'connected'|'failed'>('idle');
   const [fetchStatus, setFetchStatus] = useState<'idle'|'fetching'|'done'|'error'>('idle');
@@ -116,44 +146,164 @@ const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced, onEmplo
   const addLog = (msg: string) => setFetchLog(prev => [...prev, '[' + new Date().toLocaleTimeString() + '] ' + msg]);
 
   
+  // Try pulling real punches from the DIMS Bridge agent; fall back to simulated data only if unreachable.
+  const tryBridgeFetch = async (): Promise<ParsedRecord[] | null> => {
+    const base = (config.bridgeUrl || '').replace(/\/$/, '');
+    if (!base) return null;
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 5000);
+      const url = base + '/punches?ip=' + encodeURIComponent(config.ip)
+        + '&port=' + encodeURIComponent(config.port)
+        + '&commKey=' + encodeURIComponent(config.commKey)
+        + '&deviceType=' + encodeURIComponent(config.deviceType)
+        + '&from=' + dateRange.from + '&to=' + dateRange.to;
+      const resp = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!resp.ok) { addLog('Bridge responded ' + resp.status + ' ' + resp.statusText); return null; }
+      const payload = await resp.json();
+      const rows: any[] = Array.isArray(payload) ? payload : (payload.records || payload.data || []);
+      if (!rows.length) { addLog('Bridge returned 0 rows — check device or date range.'); return []; }
+      return rows.map((r: any) => {
+        const empCode = String(r.empCode ?? r.userId ?? r.EmployeeCode ?? r.code ?? '').trim();
+        const empName = String(r.empName ?? r.name ?? r.EmployeeName ?? '').trim();
+        const date = normalizeDate(String(r.date ?? r.logDate ?? r.attDate ?? ''));
+        const punchIn = normalizeTime(String(r.punchIn ?? r.inTime ?? r.firstPunch ?? ''));
+        const punchOut = normalizeTime(String(r.punchOut ?? r.outTime ?? r.lastPunch ?? ''));
+        const status = String(r.status ?? 'Present');
+        const matchedEmployee = employees.find(emp =>
+          (empCode && String(emp.empCode || emp.employeeCode || '').toLowerCase() === empCode.toLowerCase()) ||
+          (empName && (emp.name || '').toLowerCase().trim() === empName.toLowerCase().trim())
+        );
+        return { empCode, empName, date, punchIn, punchOut, status, matched: !!matchedEmployee, matchedEmployee };
+      }).filter(r => r.date);
+    } catch (e: any) {
+      if (e.name === 'AbortError') addLog('DIMS Bridge at ' + base + ' timed out.');
+      else addLog('DIMS Bridge unreachable at ' + base + ' (' + (e.message || 'network error') + ').');
+      return null;
+    }
+  };
+
   const handleLiveFetch = async () => {
     setFetchStatus('fetching');
     setFetchLog([]);
     setConnectionStatus('connecting');
     setErrorMsg('');
     addLog('Connecting to ' + config.deviceType + ' at ' + config.ip + ':' + config.port + '...');
-    await new Promise(r => setTimeout(r, 900));
     try {
-      addLog('Attempting HTTP connection to device...');
-      await new Promise(r => setTimeout(r, 600));
-      try {
-        const ctrl = new AbortController();
-        setTimeout(() => ctrl.abort(), 3000);
-        await fetch('http://' + config.ip + ':' + config.port + '/iclock/getrequest', { signal: ctrl.signal, mode: 'no-cors' });
-        addLog('Device responded! Reading punch logs...');
-      } catch (e: any) {
-        if (e.name === 'AbortError') addLog('Device at ' + config.ip + ' timed out.');
-        else addLog('Direct connection blocked (browser CORS policy).');
-        addLog('ℹ️ Browser security blocks direct LAN connections.');
-        addLog('Using simulated punch data based on your employees.');
-        addLog('For REAL machine data: install DIMS Bridge on your PC.');
+      // 1) Try the DIMS Bridge agent first — this is the only way to get real TCP data from a browser app.
+      addLog('Checking for DIMS Bridge at ' + config.bridgeUrl + '...');
+      const bridgeRecords = await tryBridgeFetch();
+      if (bridgeRecords && bridgeRecords.length > 0) {
+        setConnectionStatus('connected');
+        addLog('✅ Retrieved ' + bridgeRecords.length + ' real punch records from device.');
+        setParsedRecords(bridgeRecords);
+        setFetchStatus('done');
+        setStep('preview');
+        return;
+      }
+      if (bridgeRecords && bridgeRecords.length === 0) {
+        setConnectionStatus('connected');
+        addLog('Bridge connected but returned no records. Widen date range or verify device logs.');
+        setParsedRecords([]);
+        setFetchStatus('done');
+        setStep('preview');
+        return;
+      }
+
+      // 2) Bridge not available — fall back to simulated data so the workflow is still demoable.
+      addLog('ℹ️ Browser security blocks direct LAN/TCP connections to biometric devices.');
+      addLog('For REAL machine data: run the DIMS Bridge agent on any PC in the same LAN.');
+      addLog('Falling back to simulated punches from your employee list...');
+      if (employees.length === 0) {
+        throw new Error('No employees loaded. Import employees first, then retry.');
       }
       setConnectionStatus('connected');
-      await new Promise(r => setTimeout(r, 500));
-      addLog('Fetching attendance logs ' + dateRange.from + ' to ' + dateRange.to + '...');
-      await new Promise(r => setTimeout(r, 800));
-      const records = generateDemoPunches(employees, dateRange.from, dateRange.to);
-      addLog('Retrieved ' + records.length + ' punch records for ' + employees.length + ' employees.');
       await new Promise(r => setTimeout(r, 400));
-      addLog('All records processed. Ready to import!');
+      addLog('Generating demo punches for ' + dateRange.from + ' to ' + dateRange.to + '...');
+      const records = generateDemoPunches(employees, dateRange.from, dateRange.to);
+      addLog('Retrieved ' + records.length + ' simulated records for ' + employees.length + ' employees.');
       setParsedRecords(records);
       setFetchStatus('done');
       setStep('preview');
     } catch (err: any) {
       setConnectionStatus('failed');
       setFetchStatus('error');
-      addLog('Error: ' + err.message);
-      setErrorMsg(err.message);
+      addLog('Error: ' + (err.message || String(err)));
+      setErrorMsg(err.message || 'Failed to fetch punches.');
+    }
+  };
+
+  // Parse Employee Master CSV (eTimeOffice or generic biometric export) and mark duplicates.
+  const handleEmpFile = (file: File) => {
+    setEmpCsvError('');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const rows = parseCSV(text);
+        if (rows.length < 2) throw new Error('File is empty or missing header row.');
+        const headers = rows[0].map(h => h.replace(/['"]/g, '').trim());
+        const codeCol = detectCol(headers, ['emp code','empcode','employee code','code','id']);
+        const nameCol = detectCol(headers, ['emp name','empname','employee name','name']);
+        const deptCol = detectCol(headers, ['department','dept']);
+        const desgCol = detectCol(headers, ['designation','role','position','title']);
+        const mobCol  = detectCol(headers, ['mobile','phone','contact']);
+        if (codeCol === -1 || nameCol === -1) {
+          throw new Error('Could not find Emp Code and Name columns. Headers: ' + headers.join(', '));
+        }
+        const existingCodes = new Set(employees.map(e => String(e.empCode || e.employeeCode || '').toLowerCase()));
+        const existingNames = new Set(employees.map(e => (e.name || '').toLowerCase().trim()));
+        const recs: EmpRecord[] = [];
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (row.every(c => !c)) continue;
+          const empCode = (row[codeCol] || '').trim();
+          const name    = (row[nameCol] || '').trim();
+          if (!empCode && !name) continue;
+          const department  = deptCol !== -1 ? (row[deptCol] || '').trim() : '';
+          const designation = desgCol !== -1 ? (row[desgCol] || '').trim() : '';
+          const mobile      = mobCol  !== -1 ? (row[mobCol]  || '').trim() : '';
+          const alreadyExists =
+            (!!empCode && existingCodes.has(empCode.toLowerCase())) ||
+            (!!name    && existingNames.has(name.toLowerCase()));
+          recs.push({ empCode, name, department, designation, mobile, alreadyExists });
+        }
+        if (recs.length === 0) throw new Error('No employee rows found in file.');
+        setEmpRecords(recs);
+        setEmpStep('preview');
+      } catch (err: any) {
+        setEmpCsvError(err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const saveEmployees = async () => {
+    const toImport = empRecords.filter(r => !r.alreadyExists);
+    if (toImport.length === 0) return;
+    setEmpStep('saving');
+    const newEmps = toImport.map(r => ({
+      empCode: r.empCode,
+      employeeCode: r.empCode,
+      name: r.name,
+      department: r.department || 'Unassigned',
+      designation: r.designation || '',
+      mobile: r.mobile || '',
+      status: 'Active',
+      source: 'Biometric Import',
+      createdAt: new Date().toISOString(),
+    }));
+    try {
+      for (const emp of newEmps) {
+        try { await addData('employees', emp); } catch {}
+      }
+      if (onEmployeesSynced) await onEmployeesSynced(newEmps);
+      setEmpSavedCount(newEmps.length);
+      setEmpStep('done');
+    } catch (err: any) {
+      setEmpCsvError('Import failed: ' + (err.message || 'unknown error'));
+      setEmpStep('preview');
     }
   };
 
@@ -177,11 +327,11 @@ const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced, onEmplo
         for (let i = 1; i < rows.length; i++) {
           const row = rows[i];
           if (row.every(c => !c)) continue;
-          const empCode = empCodeCol !== -1 ? row[empCodeCol] || '' : '';
-          const empName = empNameCol !== -1 ? row[empNameCol] || '' : '';
-          const date = dateCol !== -1 ? row[dateCol] || '' : '';
-          const punchIn = punchInCol !== -1 ? row[punchInCol] || '' : '';
-          const punchOut = punchOutCol !== -1 ? row[punchOutCol] || '' : '';
+          const empCode = empCodeCol !== -1 ? (row[empCodeCol] || '').trim() : '';
+          const empName = empNameCol !== -1 ? (row[empNameCol] || '').trim() : '';
+          const date = normalizeDate(dateCol !== -1 ? row[dateCol] || '' : '');
+          const punchIn = normalizeTime(punchInCol !== -1 ? row[punchInCol] || '' : '');
+          const punchOut = normalizeTime(punchOutCol !== -1 ? row[punchOutCol] || '' : '');
           const status = statusCol !== -1 ? row[statusCol] || 'Present' : 'Present';
           if (!date) continue;
           const matchedEmployee = employees.find(emp =>
@@ -223,7 +373,9 @@ const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced, onEmplo
   const reset = () => {
     setStep('upload'); setParsedRecords([]); setFileName(''); setErrorMsg(''); setSavedCount(0);
     setFetchLog([]); setFetchStatus('idle'); setConnectionStatus('idle');
+    setEmpStep('idle'); setEmpRecords([]); setEmpSavedCount(0); setEmpCsvError('');
     if (fileRef.current) fileRef.current.value = '';
+    if (empFileRef.current) empFileRef.current.value = '';
   };
 
   const matchedCount = parsedRecords.filter(r => r.matched).length;
@@ -296,9 +448,13 @@ const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced, onEmplo
                     <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Comm Key</label>
                     <input type="text" value={config.commKey} onChange={e => setConfig(c => ({ ...c, commKey: e.target.value }))} placeholder="0" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
                   </div>
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">DIMS Bridge URL (required for real device data)</label>
+                    <input type="text" value={config.bridgeUrl} onChange={e => setConfig(c => ({ ...c, bridgeUrl: e.target.value }))} placeholder="http://localhost:8182" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                  </div>
                 </div>
                 <div className="mt-3 bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-700">
-                  Device must be on the same LAN or accessible via VPN.
+                  Browsers can't open raw TCP sockets to biometric devices. Run the DIMS Bridge agent on a PC in the same LAN and point the URL above at it to sync real punches.
                 </div>
               </div>
             )}
@@ -374,7 +530,7 @@ const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced, onEmplo
             {empStep === 'idle' && (
               <div
                 onClick={() => empFileRef.current?.click()}
-                className="border-2 border-dashed border-slateald-200 hover:border-emerald-400 bg-slate-50 hover:bg-emerald-50 rounded-2xl p-8 text-center cursor-pointer transition-all"
+                className="border-2 border-dashed border-slate-200 hover:border-emerald-400 bg-slate-50 hover:bg-emerald-50 rounded-2xl p-8 text-center cursor-pointer transition-all"
               >
                 <div className="flex justify-center mb-3"><div className="p-3 bg-emerald-100 rounded-xl"><Users size={28} className="text-emerald-600"/></div></div>
                 <p className="font-black text-slate-700">Upload Employee CSV from eTimeOffice</p>
