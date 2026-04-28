@@ -1,0 +1,110 @@
+// ZenAI HR Assistant — Google Gemini API (gemini-2.5-flash)
+// Now doubles as an Indian labour-law / HR-compliance assistant. The system
+// prompt explicitly grounds the model in the relevant statutes so legal-style
+// questions (ESIC ceiling, EPF cap, gratuity rules, the 4 Labour Codes, etc.)
+// get citation-style answers instead of vague generalities.
+//
+// We also enable Google Search grounding so the model can fetch fresh
+// threshold values / new notifications that may post-date its training cutoff.
+const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+
+function getKey(): string {
+  return (import.meta as any).env?.VITE_GEMINI_KEY || '';
+}
+
+const LEGAL_PRIMER = `
+You are also an Indian labour-law and HR-compliance expert. When answering legal/threshold/policy questions, cite the specific Act and section where applicable, e.g.
+  - The 4 new Labour Codes: Code on Wages 2019, Industrial Relations Code 2020, OSH Code 2020, Code on Social Security 2020
+  - Factories Act 1948
+  - Payment of Wages Act 1936
+  - Minimum Wages Act 1948
+  - Payment of Bonus Act 1965
+  - Payment of Gratuity Act 1972
+  - EPF & MP Act 1952 (current wage ceiling: ₹15,000/month)
+  - ESI Act 1948 (current wage ceiling: ₹21,000/month, ₹25,000/month for persons with disabilities)
+  - Industrial Disputes Act 1947
+  - Maternity Benefit Act 1961 (26 weeks paid leave for first 2 children)
+  - Equal Remuneration Act 1976
+  - Contract Labour (R&A) Act 1970
+  - Shops & Commercial Establishments Acts (state-specific)
+
+When threshold values or notification dates are involved, prefer the latest official source. If unsure, say so explicitly and recommend verifying with the Ministry of Labour & Employment or the relevant state department. Never invent gazette numbers or case citations.
+`.trim();
+
+async function callGemini(contents: any[], systemText: string, maxTokens = 300, useSearch = false): Promise<string> {
+  const key = getKey();
+  if (!key) throw new Error('VITE_GEMINI_KEY not configured');
+  const body: any = {
+    contents,
+    generationConfig: { temperature: 0.6, maxOutputTokens: maxTokens }
+  };
+  if (systemText) body.system_instruction = { parts: [{ text: systemText }] };
+  // Enable Google Search grounding for fresh threshold values / new rules.
+  // Costs nothing on the free tier and stays inactive when not relevant.
+  if (useSearch) body.tools = [{ google_search: {} }];
+  const resp = await fetch(GEMINI_API + '?key=' + key, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error('Gemini ' + resp.status + ': ' + err.substring(0, 150));
+  }
+  const json = await resp.json();
+  const candidate = json.candidates?.[0];
+  let text = candidate?.content?.parts?.[0]?.text || 'No response.';
+  // Append Google Search source URLs if grounding was used (transparency).
+  const grounding = candidate?.groundingMetadata;
+  if (grounding && grounding.groundingChunks) {
+    const sources = grounding.groundingChunks
+      .map((c: any) => c.web?.uri)
+      .filter(Boolean)
+      .slice(0, 3);
+    if (sources.length > 0) {
+      text += '\n\n*Sources: ' + sources.join(', ') + '*';
+    }
+  }
+  return text;
+}
+
+export async function getHRInsights(data: any): Promise<string> {
+  try {
+    return await callGemini(
+      [{ role: 'user', parts: [{ text: 'Analyze this HR data: ' + JSON.stringify(data).substring(0, 3000) }] }],
+      'You are ZenAI, an HR analytics expert for DIMS HRMS factory management system. Give exactly 2 key trends and 2 actionable recommendations using bullet points. Be concise and specific with numbers from the data. Under 100 words total.',
+      300
+    );
+  } catch (err: any) {
+    console.error('ZenAI insights error:', err.message);
+    return '⚠️ AI insights unavailable: ' + err.message.substring(0, 100);
+  }
+}
+
+// Heuristic — if the user asks about labour law, statutes, salary ceilings,
+// PF/ESI/gratuity rules, or "the new code", route through Google Search
+// grounding so we get current values + citations.
+function looksLikeLegalQuery(text: string): boolean {
+  const t = text.toLowerCase();
+  return /\b(esic?|epf|pf\b|provident\s*fund|gratuity|bonus\s*act|labour\s*code|labor\s*code|labour\s*law|labor\s*law|minimum\s*wage|payment\s*of\s*wages|factories\s*act|maternity|notice\s*period|threshold|ceiling|statutory|gazette|professional\s*tax|tds|section\s*\d|act\s*19|act\s*20|compliance|legal|notification|rule\s*\d)\b/.test(t);
+}
+
+export function createHRChat(context: any) {
+  const history: Array<{role: string; parts: Array<{text: string}>}> = [];
+  const baseSysText =
+    'You are ZenAI, expert HR assistant for DIMS HRMS (factory HR management). ' +
+    'You have access to live HR data: ' + JSON.stringify(context).substring(0, 8000) + '. ' +
+    'IMPORTANT RULES FOR EVERY REPLY:\n' +
+    '1. Keep answers under 60 words — give the crux only, no long explanations.\n' +
+    '2. For numbers/thresholds: state the value first, then one short reason.\n' +
+    '3. Use max 3 bullet points if listing. No paragraphs.\n' +
+    '4. End with one actionable line if needed.\n' +
+    '5. Use actual data numbers from the HR context when available.\n\n' +
+    LEGAL_PRIMER;
+
+  return {
+    sendMessage: async ({ message }: { message: string }) => {
+      history.push({ role: 'user', parts: [{ text: message }] });
+      try {
+        const reply = await callGemini(history, baseSysText, 200, looksLikeLegalQuery(message));
+        histor

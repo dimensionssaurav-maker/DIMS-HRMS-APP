@@ -1,0 +1,15 @@
+{
+  "name": "dims-bridge",
+  "version": "1.0.0",
+  "description": "Local HTTP bridge that connects to ZKTeco/eSSL biometric devices over TCP and exposes punches at /punches for the DIMS HRMS web app.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "node-zklib": "^1.1.10"
+  }
+}
