@@ -39,7 +39,7 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
   // Chat state
   const [isOpen,    setIsOpen]    = useState(false);
   const [messages,  setMessages]  = useState<Message[]>([
-    { role: 'model', text: 'Hi! I am ZenAI. Ask me anything about HR, payroll, or labour law.' }
+    { role: 'model', text: 'Ask me anything about HR, payroll, attendance, or Indian labour law.' }
   ]);
   const [input,     setInput]     = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -115,10 +115,10 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
   }, []);
 
   const speak = useCallback((text: string, onEnd?: () => void) => {
-    if (!synthRef.current) { console.warn('ZenAI: TTS not available'); onEnd?.(); return; }
+    if (!synthRef.current) { onEnd?.(); return; }
     if (!autoSpeak)        { onEnd?.(); return; }
 
-    synthRef.current.cancel();
+    try { synthRef.current.cancel(); } catch {}
     setIsSpeaking(false);
 
     const clean = text
@@ -130,41 +130,69 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
       .replace(/\n+/g,           '. ')
       .replace(/\s+/g,           ' ')
       .trim()
-      .slice(0, 600);
+      .slice(0, 500);
 
     if (!clean) { onEnd?.(); return; }
 
-    const utt  = new SpeechSynthesisUtterance(clean);
-    utt.lang   = language === 'hi' ? 'hi-IN' : 'en-IN';
-    utt.rate   = speechRate;
-    utt.pitch  = speechPitch;
-    utt.volume = 1;
+    // Build utterance — voiceOverride=undefined uses saved setting,
+    // voiceOverride=null means "let browser pick" (fallback after synthesis-failed)
+    const makeUtt = (voiceOverride?: SpeechSynthesisVoice | null) => {
+      const u = new SpeechSynthesisUtterance(clean);
+      u.lang   = language === 'hi' ? 'hi-IN' : 'en-IN';
+      u.rate   = speechRate;
+      u.pitch  = speechPitch;
+      u.volume = 1;
 
-    const voices = voicesRef.current;
-    const pick = voiceName
-      ? voices.find(v => v.name === voiceName)
-      : language === 'hi'
-        ? (voices.find(v => v.lang === 'hi-IN') || voices.find(v => v.lang.startsWith('hi')))
-        : (voices.find(v => v.name.includes('Google') && v.lang.startsWith('en')) ||
-           voices.find(v => v.name.includes('Microsoft') && v.lang.startsWith('en')) ||
-           voices.find(v => v.lang === 'en-IN') ||
-           voices.find(v => v.lang.startsWith('en')));
-    if (pick) utt.voice = pick;
+      if (voiceOverride !== undefined) {
+        // null = use browser default; SpeechSynthesisVoice = use that voice
+        if (voiceOverride) u.voice = voiceOverride;
+      } else {
+        const voices = voicesRef.current;
+        const pick = voiceName
+          ? voices.find(v => v.name === voiceName)
+          : language === 'hi'
+            ? (voices.find(v => v.lang === 'hi-IN' && v.localService) ||
+               voices.find(v => v.lang === 'hi-IN') ||
+               voices.find(v => v.lang.startsWith('hi')))
+            : (voices.find(v => v.name.includes('Google') && v.lang.startsWith('en')) ||
+               voices.find(v => v.name.includes('Microsoft') && v.lang.startsWith('en') && v.localService) ||
+               voices.find(v => v.name.includes('Microsoft') && v.lang.startsWith('en')) ||
+               voices.find(v => v.lang === 'en-IN') ||
+               voices.find(v => v.lang.startsWith('en')));
+        if (pick) u.voice = pick;
+      }
 
-    utt.onstart = () => { console.log('ZenAI speaking:', clean.slice(0,40)); setIsSpeaking(true); };
-    utt.onend   = () => { setIsSpeaking(false); onEnd?.(); };
-    utt.onerror = (e) => { console.warn('ZenAI TTS error:', e.error); setIsSpeaking(false); onEnd?.(); };
+      u.onstart = () => { setIsSpeaking(true); };
+      u.onend   = () => { setIsSpeaking(false); onEnd?.(); };
+      u.onerror = (e: any) => {
+        setIsSpeaking(false);
+        if (e.error === 'interrupted') return; // expected — suppress noise
+        if (e.error === 'synthesis-failed' && voiceOverride !== null) {
+          // Online voice failed (network/Edge restriction) — retry with browser default
+          console.warn('ZenAI: voice synthesis failed, retrying with default voice');
+          setTimeout(() => {
+            if (!synthRef.current) { onEnd?.(); return; }
+            try {
+              if (synthRef.current.paused) synthRef.current.resume();
+              synthRef.current.speak(makeUtt(null));
+            } catch { onEnd?.(); }
+          }, 200);
+        } else {
+          onEnd?.();
+        }
+      };
+      return u;
+    };
 
-    // Edge/Chrome fix: resume if paused, then speak with slight delay
+    // Edge/Chrome fix: resume if paused, delay before speak
     try {
-      if (synthRef.current?.paused) synthRef.current.resume();
-      synthRef.current?.cancel();
+      if (synthRef.current.paused) synthRef.current.resume();
       setTimeout(() => {
         if (!synthRef.current) return;
         if (synthRef.current.paused) synthRef.current.resume();
-        synthRef.current.speak(utt);
+        synthRef.current.speak(makeUtt(undefined));
       }, 120);
-    } catch (e) { console.error('TTS speak error:', e); onEnd?.(); }
+    } catch (e) { onEnd?.(); }
   }, [autoSpeak, language, speechRate, speechPitch, voiceName, stopSpeaking]);
 
   // ── STT listen ────────────────────────────────────────────────────────────
@@ -603,31 +631,4 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
             {sttReady ? (
               <button onClick={toggleVoiceMode}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold border ${
-                  voiceMode ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 border-slate-200'
-                }`}>
-                {voiceMode ? <MicOff size={11}/> : <Mic size={11}/>}
-                {voiceMode ? 'Exit Voice' : '🎤 Voice Mode'}
-              </button>
-            ) : (
-              <span className="text-[9px] text-amber-500 font-bold">🎤 Voice Mode needs Chrome/Edge</span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── FAB toggle button ── */}
-      <button onClick={() => setIsOpen(p => !p)}
-        className={`relative w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl transition-all hover:scale-110 active:scale-95 ${isOpen ? 'bg-slate-800' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
-        {isOpen ? <X size={24}/> : <MessageSquare size={24}/>}
-        {!isOpen && (
-          <div className="absolute -top-1 -right-1 flex h-4 w-4">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"/>
-            <span className="relative inline-flex rounded-full h-4 w-4 bg-indigo-500 border-2 border-white"/>
-          </div>
-        )}
-      </button>
-    </div>
-  );
-};
-
-export default AIChatBot;
+                  voiceMode ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 borde
