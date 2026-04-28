@@ -442,18 +442,49 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
                 <Settings size={9}/> Voice Settings
               </p>
 
-              {/* Voice selector */}
-              <div>
-                <p className="font-bold text-slate-500 mb-1">Voice</p>
-                <select value={voiceName}
-                  onChange={e => { setVoiceName(e.target.value); lsSet('zenai_voice', e.target.value); }}
-                  className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-400">
-                  <option value="">Auto (Best Available)</option>
-                  {allVoices.map(v => (
-                    <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>
-                  ))}
-                </select>
-              </div>
+              {/* Curated voice picker */}
+              {(() => {
+                const EN_PICKS = [
+                  {label:'Aria',    kw:'Aria'},
+                  {label:'Jenny',   kw:'Jenny'},
+                  {label:'Leah',    kw:'Leah'},
+                  {label:'Ravi',    kw:'Ravi'},
+                  {label:'Sonia',   kw:'Sonia'},
+                  {label:'Ryan',    kw:'Ryan'},
+                ];
+                const HI_PICKS = [
+                  {label:'Swara',   kw:'Swara'},
+                  {label:'Madhur',  kw:'Madhur'},
+                  {label:'आरती',   kw:'\u0906\u0930\u0924\u0940'},
+                  {label:'आरव',    kw:'\u0906\u0930\u0935'},
+                  {label:'Hemant',  kw:'Hemant'},
+                  {label:'Kalpana', kw:'Kalpana'},
+                ];
+                const enVoices = EN_PICKS.map(p => ({ ...p, voice: allVoices.find(v => v.name.includes(p.kw) && v.lang.startsWith('en')) })).filter(p => p.voice);
+                const hiVoices = HI_PICKS.map(p => ({ ...p, voice: allVoices.find(v => v.name.includes(p.kw) && v.lang.startsWith('hi')) })).filter(p => p.voice);
+                const renderPills = (list: any[]) => (
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    <button onClick={() => { setVoiceName(''); lsSet('zenai_voice',''); }}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${!voiceName ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'}`}>
+                      Auto
+                    </button>
+                    {list.map(p => (
+                      <button key={p.label} onClick={() => { setVoiceName(p.voice!.name); lsSet('zenai_voice', p.voice!.name); }}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${voiceName === p.voice!.name ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'}`}>
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                );
+                return (
+                  <div>
+                    <p className="font-bold text-slate-500 mb-0.5">🇬🇧 English Voice</p>
+                    {enVoices.length ? renderPills(enVoices) : <p className="text-[10px] text-slate-400">No English voices found</p>}
+                    <p className="font-bold text-slate-500 mb-0.5 mt-2">🇮🇳 Hindi Voice</p>
+                    {hiVoices.length ? renderPills(hiVoices) : <p className="text-[10px] text-slate-400">No Hindi voices found</p>}
+                  </div>
+                );
+              })()}
 
               {/* Speed */}
               <div>
@@ -482,7 +513,7 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
               </div>
 
               {/* Test voice */}
-              <button onClick={() => speak('Hello! I am ZenAI. How can I help you today?')}
+              <button onClick={() => speak(language === 'hi' ? 'नमस्ते! मैं आपकी कैसे मदद कर सकता हूँ?' : 'Hello! How can I help you with HR or payroll today?')}
                 className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold text-[10px]">
                 <PlayCircle size={12}/> Test Voice
               </button>
@@ -631,4 +662,31 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
             {sttReady ? (
               <button onClick={toggleVoiceMode}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold border ${
-                  voiceMode ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 borde
+                  voiceMode ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 border-slate-200'
+                }`}>
+                {voiceMode ? <MicOff size={11}/> : <Mic size={11}/>}
+                {voiceMode ? 'Exit Voice' : '🎤 Voice Mode'}
+              </button>
+            ) : (
+              <span className="text-[9px] text-amber-500 font-bold">🎤 Voice Mode needs Chrome/Edge</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── FAB toggle button ── */}
+      <button onClick={() => setIsOpen(p => !p)}
+        className={`relative w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl transition-all hover:scale-110 active:scale-95 ${isOpen ? 'bg-slate-800' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+        {isOpen ? <X size={24}/> : <MessageSquare size={24}/>}
+        {!isOpen && (
+          <div className="absolute -top-1 -right-1 flex h-4 w-4">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"/>
+            <span className="relative inline-flex rounded-full h-4 w-4 bg-indigo-500 border-2 border-white"/>
+          </div>
+        )}
+      </button>
+    </div>
+  );
+};
+
+export default AIChatBot;
