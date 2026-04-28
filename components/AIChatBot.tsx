@@ -31,6 +31,15 @@ declare global {
   }
 }
 
+// Safe localStorage helper — defined outside component so it's stable
+const safeGet = (key: string, fallback: string): string => {
+  try { return (typeof window !== 'undefined' && window.localStorage?.getItem(key)) || fallback; }
+  catch { return fallback; }
+};
+const safeSet = (key: string, val: string) => {
+  try { window.localStorage?.setItem(key, val); } catch {}
+};
+
 const AIChatBot: React.FC<Props> = ({ appContext }) => {
   const [isOpen, setIsOpen]           = useState(false);
   const [messages, setMessages]       = useState<Message[]>([
@@ -52,10 +61,7 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
     () => (typeof window !== 'undefined' && window.localStorage?.getItem('zenai_lang') === 'hi') ? 'hi' : 'en'
   );
 
-  // Voice customization settings (safe localStorage reads)
-  const safeGet = (key: string, fallback: string) => {
-    try { return typeof window !== 'undefined' ? (window.localStorage?.getItem(key) || fallback) : fallback; } catch { return fallback; }
-  };
+  // Voice customization settings (persisted via localStorage)
   const [speechRate,  setSpeechRate]  = useState<number>(() => parseFloat(safeGet('zenai_rate',  '0.9')));
   const [speechPitch, setSpeechPitch] = useState<number>(() => parseFloat(safeGet('zenai_pitch', '1.0')));
   const [selectedVoiceName, setSelectedVoiceName] = useState<string>(() => safeGet('zenai_voice', ''));
@@ -207,7 +213,7 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
     };
 
     try { rec.start(); } catch(e) { console.error(e); }
-  }, [isLoading, isSpeaking, language]);
+  }, [isLoading, language]);
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();
@@ -295,8 +301,10 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
       } else if (autoSpeak) {
         speak(reply);
       }
-    } catch (err) {
-      const errMsg = 'Sorry, I encountered an error. Please try again.';
+    } catch (err: any) {
+      const detail = err?.message || String(err) || 'unknown';
+      console.error('ZenAI error:', detail);
+      const errMsg = `Error: ${detail.substring(0, 120)}. Check console & API key.`;
       setMessages(prev => [...prev, { role: 'model', text: errMsg }]);
       setVoiceStatus('');
       if (isVoice && voiceMode) speak(errMsg);
@@ -439,7 +447,7 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
                   value={selectedVoiceName}
                   onChange={e => {
                     setSelectedVoiceName(e.target.value);
-                    try { window.localStorage?.setItem('zenai_voice', e.target.value); } catch {}
+                    safeSet('zenai_voice', e.target.value);
                   }}
                   className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-700 bg-white outline-none focus:ring-2 focus:ring-indigo-400">
                   <option value="">Auto (Best Available)</option>
@@ -456,7 +464,7 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
                   {[{label:'🐢 Slow', val:0.7},{label:'🚶 Normal', val:0.9},{label:'🏃 Fast', val:1.2},{label:'⚡ Very Fast', val:1.5}].map(s => (
                     <button key={s.val} onClick={() => {
                       setSpeechRate(s.val);
-                      try { window.localStorage?.setItem('zenai_rate', String(s.val)); } catch {}
+                      safeSet('zenai_rate', String(s.val));
                     }}
                       className={`flex-1 py-1.5 rounded-lg font-bold text-[9px] border transition-all ${speechRate === s.val ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'}`}>
                       {s.label}
@@ -469,8 +477,4 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
               <div>
                 <p className="font-bold text-slate-500 mb-1">Pitch</p>
                 <div className="flex gap-1.5">
-                  {[{label:'🔉 Low', val:0.7},{label:'🔊 Normal', val:1.0},{label:'🎵 High', val:1.3}].map(p => (
-                    <button key={p.val} onClick={() => {
-                      setSpeechPitch(p.val);
-                      try { window.localStorage?.setItem('zenai_pitch', String(p.val)); } catch {}
-     
+                  {[{label:'🔉 Low', val:0.7},{label:'🔊 Normal', val:1.0},{label:'🎵 High', val:1.3}]
