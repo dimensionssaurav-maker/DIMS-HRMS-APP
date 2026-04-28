@@ -692,4 +692,10 @@ export default function App() {
         onCancel={() => setShowResetTool(false)}
       />
     )}
-    <
+    <Layout activeTab={activeTab} setActiveTab={setActiveTab} allowedTabs={allowedTabs} currentUser={currentUser} onLogout={handleLogout} onOpenReset={currentUser?.role === 'Admin' ? () => setShowResetTool(true) : undefined}>
+      <div className="animate-in fade-in duration-500">{renderContent()}</div>
+      <AIChatBot appContext={appContext} />
+    </Layout>
+    </>
+  );
+}

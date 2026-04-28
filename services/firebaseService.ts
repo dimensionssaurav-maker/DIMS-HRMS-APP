@@ -2,16 +2,41 @@ import { db } from "../firebase"
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, setDoc } from "firebase/firestore"
 
 export const addData = async (collectionName: string, data: any) => {
-  // Deterministic doc IDs are useful so re-running an import upserts instead of
-  // creating duplicates. The right key depends on the collection though:
-  //   * employees      -> one doc per empCode
-  //   * attendance     -> one doc per (empCode, date) pair  (otherwise every day
-  //                       of a given employee's punches collapses into a single
-  //                       document and the last write wins)
-  // For everything else we fall back to whatever id/empCode the caller supplied,
-  // and finally to an auto-generated id.
   let docId: string | null = null
   if (collectionName === 'attendance') {
     const code = data.empCode || data.employeeCode || data.employeeId
     const date = data.date
-    if (code && date) docId = String(cod
+    if (code && date) docId = String(code) + '_' + String(date)
+  } else if (collectionName === 'employees') {
+    docId = data.empCode || data.employeeCode || data.id || null
+    if (docId !== null) docId = String(docId)
+  } else {
+    const fallback = data.empCode || data.id || data.employeeCode
+    if (fallback) docId = String(fallback)
+  }
+
+  if (docId) {
+    const ref = doc(db, collectionName, docId)
+    await setDoc(ref, data, { merge: true })
+    return { id: docId }
+  }
+  return await addDoc(collection(db, collectionName), data)
+}
+
+export const getData = async (collectionName: string) => {
+  const snapshot = await getDocs(collection(db, collectionName))
+  return snapshot.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }))
+}
+
+export const updateData = async (collectionName: string, id: string, data: any) => {
+  const ref = doc(db, collectionName, id)
+  return await updateDoc(ref, data)
+}
+
+export const deleteData = async (collectionName: string, id: string) => {
+  const ref = doc(db, collectionName, id)
+  return await deleteDoc(ref)
+}

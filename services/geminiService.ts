@@ -1,11 +1,4 @@
 // ZenAI HR Assistant — Google Gemini API (gemini-2.5-flash)
-// Now doubles as an Indian labour-law / HR-compliance assistant. The system
-// prompt explicitly grounds the model in the relevant statutes so legal-style
-// questions (ESIC ceiling, EPF cap, gratuity rules, the 4 Labour Codes, etc.)
-// get citation-style answers instead of vague generalities.
-//
-// We also enable Google Search grounding so the model can fetch fresh
-// threshold values / new notifications that may post-date its training cutoff.
 const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 function getKey(): string {
@@ -39,8 +32,6 @@ async function callGemini(contents: any[], systemText: string, maxTokens = 300, 
     generationConfig: { temperature: 0.6, maxOutputTokens: maxTokens }
   };
   if (systemText) body.system_instruction = { parts: [{ text: systemText }] };
-  // Enable Google Search grounding for fresh threshold values / new rules.
-  // Costs nothing on the free tier and stays inactive when not relevant.
   if (useSearch) body.tools = [{ google_search: {} }];
   const resp = await fetch(GEMINI_API + '?key=' + key, {
     method: 'POST',
@@ -54,7 +45,6 @@ async function callGemini(contents: any[], systemText: string, maxTokens = 300, 
   const json = await resp.json();
   const candidate = json.candidates?.[0];
   let text = candidate?.content?.parts?.[0]?.text || 'No response.';
-  // Append Google Search source URLs if grounding was used (transparency).
   const grounding = candidate?.groundingMetadata;
   if (grounding && grounding.groundingChunks) {
     const sources = grounding.groundingChunks
@@ -81,9 +71,6 @@ export async function getHRInsights(data: any): Promise<string> {
   }
 }
 
-// Heuristic — if the user asks about labour law, statutes, salary ceilings,
-// PF/ESI/gratuity rules, or "the new code", route through Google Search
-// grounding so we get current values + citations.
 function looksLikeLegalQuery(text: string): boolean {
   const t = text.toLowerCase();
   return /\b(esic?|epf|pf\b|provident\s*fund|gratuity|bonus\s*act|labour\s*code|labor\s*code|labour\s*law|labor\s*law|minimum\s*wage|payment\s*of\s*wages|factories\s*act|maternity|notice\s*period|threshold|ceiling|statutory|gazette|professional\s*tax|tds|section\s*\d|act\s*19|act\s*20|compliance|legal|notification|rule\s*\d)\b/.test(t);
@@ -109,4 +96,22 @@ export function createHRChat(context: any) {
     '1. Max 50 words. Crux only — no intros, no self-descriptions.\n' +
     '2. Never say "I am ZenAI" or introduce yourself — just answer.\n' +
     '3. State numbers first, then one-line reason.\n' +
-    '4. Max 3 bul
+    '4. Max 3 bullet points. No paragraphs.\n' +
+    '5. Use actual numbers from LIVE DATA above.\n\n' +
+    LEGAL_PRIMER;
+
+  return {
+    sendMessage: async ({ message }: { message: string }) => {
+      history.push({ role: 'user', parts: [{ text: message }] });
+      try {
+        const reply = await callGemini(history, baseSysText, 200, looksLikeLegalQuery(message));
+        history.push({ role: 'model', parts: [{ text: reply }] });
+        return { text: reply };
+      } catch (err: any) {
+        history.pop();
+        throw err;
+      }
+    },
+    clearHistory: () => { history.length = 0; }
+  };
+}

@@ -819,4 +819,3 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
 };
 
 export default EmployeeManagement;
-                       

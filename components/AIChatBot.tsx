@@ -462,4 +462,172 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
           )}
 
           {/* ── Text chat messages ── */}
-        
+
+          {!voiceMode && (
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`flex gap-2 max-w-[88%] ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${msg.role === 'user' ? 'bg-slate-200 text-slate-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                      {msg.role === 'user' ? <User size={14}/> : <Bot size={14}/>}
+                    </div>
+                    <div className={`p-3 rounded-2xl text-[13px] leading-relaxed shadow-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none'}`}>
+                      <div className="whitespace-pre-wrap">{msg.text}</div>
+                      {msg.role === 'model' && ttsReady && (
+                        <button onClick={() => speak(msg.text)}
+                          className="mt-1.5 text-[10px] flex items-center gap-1 font-bold text-indigo-300 hover:text-indigo-500">
+                          <Volume2 size={10}/> Replay
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {isListening && transcript && (
+                <div className="flex justify-end">
+                  <div className="bg-indigo-50 border border-indigo-200 text-indigo-600 text-sm px-4 py-2 rounded-2xl max-w-[88%] italic animate-pulse">
+                    "{transcript}"
+                  </div>
+                </div>
+              )}
+
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="flex gap-2 items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+                    {[0,1,2].map(i => (
+                      <div key={i} className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay:`${i*150}ms` }}/>
+                    ))}
+                    <span className="text-xs font-medium text-slate-400">ZenAI is thinking…</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Voice mode big mic UI ── */}
+          {voiceMode && (
+            <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-white px-6 gap-5">
+              <div className="relative flex items-center justify-center">
+                {isListening && (
+                  <>
+                    <div className="absolute w-32 h-32 rounded-full bg-red-400/20 animate-ping"/>
+                    <div className="absolute w-28 h-28 rounded-full bg-red-400/15 animate-ping" style={{ animationDelay:'200ms' }}/>
+                  </>
+                )}
+                {isSpeaking && (
+                  <>
+                    <div className="absolute w-32 h-32 rounded-full bg-emerald-400/20 animate-ping"/>
+                    <div className="absolute w-28 h-28 rounded-full bg-emerald-400/15 animate-ping" style={{ animationDelay:'300ms' }}/>
+                  </>
+                )}
+                <button onClick={handleMicClick} disabled={isLoading}
+                  className={`relative z-10 w-24 h-24 rounded-full flex items-center justify-center text-white shadow-xl transition-all duration-300 disabled:opacity-50 active:scale-95 ${
+                    isListening ? 'bg-red-500 scale-110' : isSpeaking ? 'bg-emerald-500' : 'bg-indigo-600 hover:scale-105'}`}>
+                  {isListening ? <MicOff size={36}/> : isSpeaking ? <Volume2 size={36} className="animate-pulse"/> : <Mic size={36}/>}
+                </button>
+              </div>
+
+              <div className="text-center">
+                <p className="font-black text-slate-700 text-base">
+                  {isListening ? 'Listening…' : isSpeaking ? 'ZenAI is Speaking' : isLoading ? 'Processing…' : 'Tap to Speak'}
+                </p>
+                <p className="text-xs text-slate-400 font-medium mt-1">
+                  {isSpeaking ? 'Tap mic to interrupt' : 'ZenAI will reply by voice'}
+                </p>
+              </div>
+
+              {messages.length > 1 && (
+                <div className="w-full bg-white rounded-2xl border border-slate-100 shadow-sm p-3 max-h-24 overflow-y-auto">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
+                    <Bot size={10}/> Last Response
+                  </p>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {messages.filter(m => m.role === 'model').slice(-1)[0]?.text.slice(0, 160)}…
+                  </p>
+                </div>
+              )}
+
+              <div className="w-full flex gap-2">
+                <input value={input} onChange={e => setInput(e.target.value)}
+                  onKeyPress={e => e.key === 'Enter' && handleSend()}
+                  placeholder="Or type a message…"
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-400"/>
+                <button onClick={handleSend} disabled={!input.trim() || isLoading}
+                  className="bg-indigo-600 text-white px-3 py-2 rounded-xl disabled:opacity-40">
+                  <Send size={14}/>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Quick report chips ── */}
+          {!voiceMode && (
+            <div className="px-3 pt-2 pb-1 bg-white border-t border-slate-100">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 px-1">Quick Reports</p>
+              <div className="flex gap-1.5 flex-wrap">
+                {[
+                  { label:'Monthly Attendance', icon:<FileBarChart size={11}/>, msg:'generate monthly attendance report', cls:'indigo' },
+                  { label:'Daily Punch',         icon:<FileText size={11}/>,    msg:'generate today daily punch report', cls:'emerald' },
+                  { label:'Late Arrivals',       icon:<ClockIcon size={11}/>,   msg:'generate late arrivals report for this month', cls:'rose' },
+                  { label:'Salary',              icon:<IndianRupee size={11}/>, msg:'generate salary report for this month', cls:'amber' },
+                ].map(r => (
+                  <button key={r.label} onClick={() => sendMessage(r.msg)} disabled={isLoading}
+                    className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-${r.cls}-50 text-${r.cls}-700 hover:bg-${r.cls}-100 border border-${r.cls}-100 disabled:opacity-50`}>
+                    {r.icon} {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Text input ── */}
+          {!voiceMode && (
+            <div className="p-3 bg-white border-t border-slate-100">
+              <div className="flex gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 focus-within:ring-2 focus-within:ring-indigo-400">
+                <input value={input} onChange={e => setInput(e.target.value)}
+                  onKeyPress={e => e.key === 'Enter' && handleSend()}
+                  placeholder="Ask about payroll, attendance, employees…"
+                  className="flex-1 bg-transparent px-3 py-2 text-sm outline-none text-slate-700"/>
+                <button onClick={handleSend} disabled={isLoading || !input.trim()}
+                  className="bg-indigo-600 text-white p-2.5 rounded-xl hover:bg-indigo-700 disabled:opacity-40 shadow-sm">
+                  <Send size={16}/>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Footer ── */}
+          <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+            <p className="text-[9px] text-slate-400 font-medium">Powered by Gemini • DIMS HRMS</p>
+            {sttReady ? (
+              <button onClick={toggleVoiceMode}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold border ${
+                  voiceMode ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 border-slate-200'
+                }`}>
+                {voiceMode ? <MicOff size={11}/> : <Mic size={11}/>}
+                {voiceMode ? 'Exit Voice' : '🎤 Voice Mode'}
+              </button>
+            ) : (
+              <span className="text-[9px] text-amber-500 font-bold">🎤 Voice Mode needs Chrome/Edge</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── FAB toggle button ── */}
+      <button onClick={() => setIsOpen(p => !p)}
+        className={`relative w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl transition-all hover:scale-110 active:scale-95 ${isOpen ? 'bg-slate-800' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+        {isOpen ? <X size={24}/> : <MessageSquare size={24}/>}
+        {!isOpen && (
+          <div className="absolute -top-1 -right-1 flex h-4 w-4">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"/>
+            <span className="relative inline-flex rounded-full h-4 w-4 bg-indigo-500 border-2 border-white"/>
+          </div>
+        )}
+      </button>
+    </div>
+  );
+};
+
+export default AIChatBot;

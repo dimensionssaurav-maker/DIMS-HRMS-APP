@@ -862,4 +862,31 @@ const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced, onEmplo
                     <td className="px-3 py-2 text-slate-500">{r.date}</td>
                     <td className="px-3 py-2">{r.punchIn ? <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-bold">{r.punchIn}</span> : <span className="text-slate-300">-</span>}</td>
                     <td className="px-3 py-2">{r.punchOut ? <span className="bg-red-50 text-red-700 px-2 py-0.5 rounded font-bold">{r.punchOut}</span> : <span className="text-slate-300">-</span>}</td>
-                    <td className="px-3 py-2"><span className={"px-2 py-0.5 rounded-full text-[10px] font-bold " + (r.status.toLo
+                    <td className="px-3 py-2"><span className={"px-2 py-0.5 rounded-full text-[10px] font-bold " + (r.status.toLowerCase().includes('present') || r.status.toUpperCase().startsWith('P') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600')}>{r.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={reset} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl">Back</button>
+            <button onClick={saveToFirebase} disabled={isSaving} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50">
+              {isSaving ? <><RefreshCw size={16} className="animate-spin" /> Saving...</> : <><Database size={16} /> Import {parsedRecords.length} Records</>}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 'done' && (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 text-center">
+          <div className="flex justify-center mb-4"><div className="p-4 bg-emerald-100 rounded-full"><CheckCircle2 size={40} className="text-emerald-600" /></div></div>
+          <h3 className="text-xl font-black text-slate-800 mb-2">Sync Successful</h3>
+          <p className="text-slate-500 text-sm mb-6"><span className="font-black text-emerald-600 text-2xl">{savedCount}</span> attendance records saved to DIMS HRMS</p>
+          <button onClick={reset} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl">Sync Again</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default BiometricSync;
