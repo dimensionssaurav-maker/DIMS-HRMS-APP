@@ -87,6 +87,17 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
     }
   }, []);
 
+  // Reset chat session whenever live data changes so AI always has fresh context
+  useEffect(() => {
+    chatRef.current = null;
+  }, [
+    appContext?.employees?.length,
+    appContext?.attendanceSummary,
+    appContext?.payrollTotal,
+    appContext?.selectedMonth,
+    appContext?.selectedYear,
+  ]);
+
   useEffect(() => {
     if (scrollRef.current)
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -462,7 +473,4 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
                     <button key={p.val} onClick={() => {
                       setSpeechPitch(p.val);
                       try { window.localStorage?.setItem('zenai_pitch', String(p.val)); } catch {}
-                    }}
-                      className={`flex-1 py-1.5 rounded-lg font-bold text-[9px] border transition-all ${speechPitch === p.val ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'}`}>
-                      {p.label}
-         
+     

@@ -91,20 +91,22 @@ function looksLikeLegalQuery(text: string): boolean {
 
 export function createHRChat(context: any) {
   const history: Array<{role: string; parts: Array<{text: string}>}> = [];
-  const baseSysText =
-    'You are ZenAI, expert HR assistant for DIMS HRMS (factory HR management). ' +
-    'You have access to live HR data: ' + JSON.stringify(context).substring(0, 8000) + '. ' +
-    'IMPORTANT RULES FOR EVERY REPLY:\n' +
-    '1. Keep answers under 60 words — give the crux only, no long explanations.\n' +
-    '2. For numbers/thresholds: state the value first, then one short reason.\n' +
-    '3. Use max 3 bullet points if listing. No paragraphs.\n' +
-    '4. End with one actionable line if needed.\n' +
-    '5. Use actual data numbers from the HR context when available.\n\n' +
-    LEGAL_PRIMER;
+  const empCount   = Array.isArray(context?.employees) ? context.employees.length : 0;
+  const attCount   = context?.attendanceSummary || 0;
+  const payTotal   = context?.payrollTotal || 0;
+  const month      = context?.selectedMonth || '';
+  const year       = context?.selectedYear || '';
 
-  return {
-    sendMessage: async ({ message }: { message: string }) => {
-      history.push({ role: 'user', parts: [{ text: message }] });
-      try {
-        const reply = await callGemini(history, baseSysText, 200, looksLikeLegalQuery(message));
-        histor
+  const baseSysText =
+    'You are ZenAI, HR assistant for DIMS HRMS.\n' +
+    'LIVE DATA: ' +
+    `Employees: ${empCount}, ` +
+    `Attendance records: ${attCount}, ` +
+    `Payroll total: ₹${payTotal}, ` +
+    `Month: ${month} ${year}.\n` +
+    'Full context: ' + JSON.stringify(context).substring(0, 6000) + '\n\n' +
+    'STRICT REPLY RULES (follow every time):\n' +
+    '1. Max 50 words. Crux only — no intros, no self-descriptions.\n' +
+    '2. Never say "I am ZenAI" or introduce yourself — just answer.\n' +
+    '3. State numbers first, then one-line reason.\n' +
+    '4. Max 3 bul
