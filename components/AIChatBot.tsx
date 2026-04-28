@@ -155,8 +155,16 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
     utt.onend   = () => { setIsSpeaking(false); onEnd?.(); };
     utt.onerror = (e) => { console.warn('ZenAI TTS error:', e.error); setIsSpeaking(false); onEnd?.(); };
 
-    // Chrome bug workaround: must call speak() after a tiny delay sometimes
-    setTimeout(() => synthRef.current?.speak(utt), 50);
+    // Edge/Chrome fix: resume if paused, then speak with slight delay
+    try {
+      if (synthRef.current?.paused) synthRef.current.resume();
+      synthRef.current?.cancel();
+      setTimeout(() => {
+        if (!synthRef.current) return;
+        if (synthRef.current.paused) synthRef.current.resume();
+        synthRef.current.speak(utt);
+      }, 120);
+    } catch (e) { console.error('TTS speak error:', e); onEnd?.(); }
   }, [autoSpeak, language, speechRate, speechPitch, voiceName, stopSpeaking]);
 
   // ── STT listen ────────────────────────────────────────────────────────────
@@ -321,8 +329,8 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
     <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end select-none">
 
       {isOpen && (
-        <div className="bg-white w-[380px] rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden mb-4"
-          style={{ height: voiceMode ? '530px' : '620px' }}>
+        <div className="bg-white w-[460px] rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden mb-4"
+          style={{ height: voiceMode ? '640px' : '740px' }}>
 
           {/* ── Header ── */}
           <div className={`p-4 text-white flex items-center justify-between shadow-lg ${voiceMode ? 'bg-gradient-to-r from-violet-700 via-indigo-600 to-indigo-700' : 'bg-indigo-600'}`}>
@@ -366,8 +374,8 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
               {ttsReady && (
                 <button onClick={() => setShowSettings(p => !p)}
                   title="Voice Settings"
-                  className={`p-1.5 rounded-lg transition-all ${showSettings ? 'bg-white/30' : 'bg-white/15 hover:bg-white/25'}`}>
-                  <Settings size={15}/>
+                  className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all ${showSettings ? 'bg-white/30 text-white' : 'bg-white/15 hover:bg-white/25 text-white'}`}>
+                  <Settings size={13}/> Voice
                 </button>
               )}
 
@@ -401,7 +409,7 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
 
           {/* ── Voice Settings Panel ── */}
           {showSettings && (
-            <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 space-y-3 text-xs overflow-y-auto" style={{maxHeight:'230px'}}>
+            <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 space-y-3 text-xs overflow-y-auto" style={{maxHeight:'280px'}}>
               <p className="font-black text-slate-500 uppercase tracking-widest text-[9px] flex items-center gap-1">
                 <Settings size={9}/> Voice Settings
               </p>
@@ -454,8 +462,4 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
           )}
 
           {/* ── Text chat messages ── */}
-          {!voiceMode && (
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
-              {messages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`flex gap-2 max-w-[88%] ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+        
