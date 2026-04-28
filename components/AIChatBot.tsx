@@ -445,23 +445,31 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
               {/* Curated voice picker */}
               {(() => {
                 const EN_PICKS = [
-                  {label:'Aria',    kw:'Aria'},
-                  {label:'Jenny',   kw:'Jenny'},
-                  {label:'Leah',    kw:'Leah'},
-                  {label:'Ravi',    kw:'Ravi'},
-                  {label:'Sonia',   kw:'Sonia'},
-                  {label:'Ryan',    kw:'Ryan'},
+                  {label:'Aria',      kw:'Aria'},
+                  {label:'Jenny',     kw:'Jenny'},
+                  {label:'Leah',      kw:'Leah'},
+                  {label:'Ravi',      kw:'Ravi'},
+                  {label:'Sonia',     kw:'Sonia'},
+                  {label:'Ryan',      kw:'Ryan'},
+                  {label:'Google US', kw:'Google US English'},
+                  {label:'Google UK ♀',kw:'Google UK English Female'},
+                  {label:'Google UK ♂',kw:'Google UK English Male'},
+                  {label:'Google IN', kw:'Google हिन्दी'},
                 ];
                 const HI_PICKS = [
-                  {label:'Swara',   kw:'Swara'},
-                  {label:'Madhur',  kw:'Madhur'},
-                  {label:'आरती',   kw:'\u0906\u0930\u0924\u0940'},
-                  {label:'आरव',    kw:'\u0906\u0930\u0935'},
-                  {label:'Hemant',  kw:'Hemant'},
-                  {label:'Kalpana', kw:'Kalpana'},
+                  {label:'Swara',     kw:'Swara'},
+                  {label:'Madhur',    kw:'Madhur'},
+                  {label:'आरती',     kw:'\u0906\u0930\u0924\u0940'},
+                  {label:'आरव',      kw:'\u0906\u0930\u0935'},
+                  {label:'Hemant',    kw:'Hemant'},
+                  {label:'Kalpana',   kw:'Kalpana'},
+                  {label:'Google',    kw:'Google \u0939\u093f\u0928\u094d\u0926\u0940'},
                 ];
-                const enVoices = EN_PICKS.map(p => ({ ...p, voice: allVoices.find(v => v.name.includes(p.kw) && v.lang.startsWith('en')) })).filter(p => p.voice);
-                const hiVoices = HI_PICKS.map(p => ({ ...p, voice: allVoices.find(v => v.name.includes(p.kw) && v.lang.startsWith('hi')) })).filter(p => p.voice);
+                const makeLabel = (v: SpeechSynthesisVoice) => v.name.replace('Microsoft ','').replace(' Online (Natural)','').replace(' - Hindi (India)','').replace(' - English (United States)','').replace(' - English (India)','').replace(' - English (United Kingdom)','').slice(0,14);
+                let enVoices: {label:string, voice:SpeechSynthesisVoice}[] = EN_PICKS.map(p => ({ label:p.label, voice: allVoices.find(v => v.name.includes(p.kw) && v.lang.startsWith('en'))! })).filter(p => p.voice);
+                if (!enVoices.length) enVoices = allVoices.filter(v => v.lang.startsWith('en')).slice(0,6).map(v => ({label:makeLabel(v), voice:v}));
+                let hiVoices: {label:string, voice:SpeechSynthesisVoice}[] = HI_PICKS.map(p => ({ label:p.label, voice: allVoices.find(v => v.name.includes(p.kw) && v.lang.startsWith('hi'))! })).filter(p => p.voice);
+                if (!hiVoices.length) hiVoices = allVoices.filter(v => v.lang.startsWith('hi')).slice(0,6).map(v => ({label:makeLabel(v), voice:v}));
                 const renderPills = (list: any[]) => (
                   <div className="flex flex-wrap gap-1.5 mt-1">
                     <button onClick={() => { setVoiceName(''); lsSet('zenai_voice',''); }}
