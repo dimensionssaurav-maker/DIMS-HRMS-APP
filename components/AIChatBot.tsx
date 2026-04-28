@@ -34,7 +34,7 @@ declare global {
 const AIChatBot: React.FC<Props> = ({ appContext }) => {
   const [isOpen, setIsOpen]           = useState(false);
   const [messages, setMessages]       = useState<Message[]>([
-    { role: 'model', text: 'Hello! I am ZenAI, your HRMS voice assistant. Tap the mic and speak, or type your question.' }
+    { role: 'model', text: 'Hi! I am ZenAI. Tap the mic or type your question.' }
   ]);
   const [input, setInput]             = useState('');
   const [isLoading, setIsLoading]     = useState(false);
@@ -143,8 +143,8 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
 
   // ── STT ─────────────────────────────────────────────────────────────────
   const startListening = useCallback(() => {
-    if (isLoading || isSpeaking) return;
-    stopSpeaking();
+    if (isLoading) return;
+    stopSpeaking(); // always stop AI speech before listening
 
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return;
@@ -315,8 +315,13 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
   };
 
   const handleMicClick = () => {
-    if (isListening) stopListening();
-    else startListening();
+    if (isListening) {
+      stopListening();
+    } else {
+      // Always stop speaking first so mic is never blocked
+      if (isSpeaking) stopSpeaking();
+      setTimeout(() => startListening(), 100);
+    }
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -460,10 +465,4 @@ const AIChatBot: React.FC<Props> = ({ appContext }) => {
                     }}
                       className={`flex-1 py-1.5 rounded-lg font-bold text-[9px] border transition-all ${speechPitch === p.val ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'}`}>
                       {p.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Test voice */}
-           
+         
