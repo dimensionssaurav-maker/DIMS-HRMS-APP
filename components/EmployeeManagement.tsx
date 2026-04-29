@@ -2,7 +2,7 @@ import { db } from "../firebase";
 import JoiningFormParser from './JoiningFormParser';
 import { collection, addDoc } from "firebase/firestore";
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, Upload, UserPlus, Edit2, Trash2, Building2, ArrowUpDown, ArrowUp, ArrowDown, AlertCircle, X, Save, Clock, Users, Wifi, ClipboardCopy, ArrowRight, Briefcase, IndianRupee, MapPin, Share2, Percent, MoreHorizontal, UserX, UserCheck, Calendar, RotateCcw, User, Camera, Check, FileText, Download } from 'lucide-react';
+import { Search, Upload, Loader2, UserPlus, Edit2, Trash2, Building2, ArrowUpDown, ArrowUp, ArrowDown, AlertCircle, X, Save, Clock, Users, Wifi, ClipboardCopy, ArrowRight, Briefcase, IndianRupee, MapPin, Share2, Percent, MoreHorizontal, UserX, UserCheck, Calendar, RotateCcw, User, Camera, Check, FileText, Download } from 'lucide-react';
 import { Employee, Shift, PayrollConfig } from '../types';
 
 interface Props {
@@ -33,6 +33,19 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showJoiningForm, setShowJoiningForm] = useState(false);
+  const [joinForms, setJoinForms] = useState<Record<string,string>[]>([]);
+  const [loadingForms, setLoadingForms] = useState(false);
+  const [showFormsModal, setShowFormsModal] = useState(false);
+
+  const fetchJoinForms = async () => {
+    setLoadingForms(true);
+    try {
+      const { getData } = await import('../services/firebaseService');
+      const data = await getData('joinForms') as Record<string,string>[];
+      setJoinForms(data);
+    } catch(e) { console.error(e); }
+    setLoadingForms(false);
+  };
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -356,6 +369,9 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
           
           <button onClick={() => { setShowImportModal(true); setImportStep('input'); }} className="bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
             <Users size={18} /> Bulk Import
+          </button>
+          <button onClick={() => { setShowFormsModal(true); fetchJoinForms(); }} className="bg-white border border-emerald-200 text-emerald-700 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-50 transition-all">
+            <FileText size={16} /> View Forms
           </button>
           <button onClick={() => setShowJoiningForm(true)} className="bg-white border border-indigo-200 text-indigo-600 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-50 transition-all">
             <Upload size={16} /> Upload Joining Form
@@ -819,6 +835,83 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
           </div>
         </div>
       )}
+      {/* ── JOINING FORMS VIEWER MODAL ── */}
+      {showFormsModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-5 flex items-center justify-between text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center">
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <h2 className="font-black text-lg">Uploaded Joining Forms</h2>
+                  <p className="text-emerald-200 text-xs">{joinForms.length} form{joinForms.length !== 1 ? 's' : ''} stored in Firebase</p>
+                </div>
+              </div>
+              <button onClick={() => setShowFormsModal(false)} className="p-2 hover:bg-white/10 rounded-xl transition-colors"><X size={20} /></button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 p-6">
+              {loadingForms ? (
+                <div className="flex items-center justify-center py-20 gap-3 text-slate-400">
+                  <Loader2 size={24} className="animate-spin" /><span className="font-medium">Loading forms…</span>
+                </div>
+              ) : joinForms.length === 0 ? (
+                <div className="text-center py-20 text-slate-400">
+                  <FileText size={40} className="mx-auto mb-3 opacity-30" />
+                  <p className="font-medium">No joining forms uploaded yet</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {joinForms.map((form, idx) => (
+                    <div key={idx} className="border border-slate-200 rounded-2xl overflow-hidden">
+                      {/* Form header */}
+                      <div className="bg-slate-800 text-white px-5 py-3 flex items-center justify-between">
+                        <div>
+                          <p className="font-black text-base">{form.name || '(No Name)'}</p>
+                          <p className="text-slate-400 text-xs">Code: {form.employeeCode || '—'} · Joined: {form.joiningDate || '—'} · Saved: {form.savedAt ? new Date(form.savedAt).toLocaleDateString('en-IN') : '—'}</p>
+                        </div>
+                        <span className="bg-emerald-500 text-white text-[10px] font-black px-3 py-1 rounded-full">{form.department || 'No Dept'}</span>
+                      </div>
+                      {/* Fields grid */}
+                      <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {[
+                          ['Source', form.source],['Designation', form.designation],['Experience', (form.experienceYears ? form.experienceYears+'y ' : '')+(form.experienceMonths ? form.experienceMonths+'m' : '')],
+                          ['Mobile', form.mobileNo],['Gender', form.gender],['Marital Status', form.maritalStatus],
+                          ['Date of Birth', form.dateOfBirth],['Father Name', form.fathersName],['Nominee', form.nomineeName],
+                          ['Relation', form.nomineeRelation],['Qualification', form.qualification],['Aadhar No', form.aadharNo],
+                          ['PAN No', form.panNo],['ESIC No', form.esicNo],['EPF No', form.epfNo],['Salary', form.salary],
+                          ['Bank Name', form.bankName],['IFSC Code', form.ifscCode],['A/C No', form.accountNo],
+                        ].filter(([,v]) => v).map(([label, val]) => (
+                          <div key={label as string} className="bg-slate-50 rounded-xl p-3">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">{label as string}</p>
+                            <p className="text-xs font-semibold text-slate-800 break-all">{val as string}</p>
+                          </div>
+                        ))}
+                        {form.permanentAddress && (
+                          <div className="bg-slate-50 rounded-xl p-3 col-span-2">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Permanent Address</p>
+                            <p className="text-xs font-semibold text-slate-800">{form.permanentAddress}</p>
+                          </div>
+                        )}
+                        {form.presentAddress && (
+                          <div className="bg-slate-50 rounded-xl p-3 col-span-2">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Present Address</p>
+                            <p className="text-xs font-semibold text-slate-800">{form.presentAddress}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showJoiningForm && (
         <JoiningFormParser
           onClose={() => setShowJoiningForm(false)}
