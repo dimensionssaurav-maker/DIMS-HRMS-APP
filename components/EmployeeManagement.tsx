@@ -853,7 +853,7 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
               <button onClick={() => setShowFormsModal(false)} className="p-2 hover:bg-white/10 rounded-xl transition-colors"><X size={20} /></button>
             </div>
 
-            <div className="overflow-y-auto flex-1 p-6">
+            <div className="overflow-auto flex-1">
               {loadingForms ? (
                 <div className="flex items-center justify-center py-20 gap-3 text-slate-400">
                   <Loader2 size={24} className="animate-spin" /><span className="font-medium">Loading forms…</span>
@@ -864,48 +864,55 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
                   <p className="font-medium">No joining forms uploaded yet</p>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {joinForms.map((form, idx) => (
-                    <div key={idx} className="border border-slate-200 rounded-2xl overflow-hidden">
-                      {/* Form header */}
-                      <div className="bg-slate-800 text-white px-5 py-3 flex items-center justify-between">
-                        <div>
-                          <p className="font-black text-base">{form.name || '(No Name)'}</p>
-                          <p className="text-slate-400 text-xs">Code: {form.employeeCode || '—'} · Joined: {form.joiningDate || '—'} · Saved: {form.savedAt ? new Date(form.savedAt).toLocaleDateString('en-IN') : '—'}</p>
-                        </div>
-                        <span className="bg-emerald-500 text-white text-[10px] font-black px-3 py-1 rounded-full">{form.department || 'No Dept'}</span>
-                      </div>
-                      {/* Fields grid */}
-                      <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {[
-                          ['Source', form.source],['Designation', form.designation],['Experience', (form.experienceYears ? form.experienceYears+'y ' : '')+(form.experienceMonths ? form.experienceMonths+'m' : '')],
-                          ['Mobile', form.mobileNo],['Gender', form.gender],['Marital Status', form.maritalStatus],
-                          ['Date of Birth', form.dateOfBirth],['Father Name', form.fathersName],['Nominee', form.nomineeName],
-                          ['Relation', form.nomineeRelation],['Qualification', form.qualification],['Aadhar No', form.aadharNo],
-                          ['PAN No', form.panNo],['ESIC No', form.esicNo],['EPF No', form.epfNo],['Salary', form.salary],
-                          ['Bank Name', form.bankName],['IFSC Code', form.ifscCode],['A/C No', form.accountNo],
-                        ].filter(([,v]) => v).map(([label, val]) => (
-                          <div key={label as string} className="bg-slate-50 rounded-xl p-3">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">{label as string}</p>
-                            <p className="text-xs font-semibold text-slate-800 break-all">{val as string}</p>
-                          </div>
-                        ))}
-                        {form.permanentAddress && (
-                          <div className="bg-slate-50 rounded-xl p-3 col-span-2">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Permanent Address</p>
-                            <p className="text-xs font-semibold text-slate-800">{form.permanentAddress}</p>
-                          </div>
-                        )}
-                        {form.presentAddress && (
-                          <div className="bg-slate-50 rounded-xl p-3 col-span-2">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Present Address</p>
-                            <p className="text-xs font-semibold text-slate-800">{form.presentAddress}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <table className="w-full text-xs border-collapse min-w-[1400px]">
+                  <thead>
+                    <tr className="bg-slate-800 text-white sticky top-0 z-10">
+                      {[
+                        '#','Emp Code','Name','Department','Designation','Source',
+                        'Joining Date','DOB','Gender','Marital Status',
+                        'Mobile','Father Name','Nominee','Relation','Qualification',
+                        'Aadhar No','PAN No','ESIC No','EPF No',
+                        'Bank Name','IFSC Code','A/C No','Salary',
+                        'Experience','Permanent Address','Present Address','Saved On'
+                      ].map(h => (
+                        <th key={h} className="px-3 py-3 text-left font-black text-[10px] uppercase tracking-wider whitespace-nowrap border-r border-slate-700 last:border-r-0">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {joinForms.map((form, idx) => (
+                      <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                        <td className="px-3 py-2.5 text-slate-400 font-bold border-r border-slate-100 whitespace-nowrap">{idx + 1}</td>
+                        <td className="px-3 py-2.5 font-black text-indigo-700 border-r border-slate-100 whitespace-nowrap">{form.employeeCode || '—'}</td>
+                        <td className="px-3 py-2.5 font-bold text-slate-800 border-r border-slate-100 whitespace-nowrap">{form.name || '—'}</td>
+                        <td className="px-3 py-2.5 border-r border-slate-100 whitespace-nowrap"><span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold text-[10px]">{form.department || '—'}</span></td>
+                        <td className="px-3 py-2.5 text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.designation || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.source || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.joiningDate || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.dateOfBirth || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.gender || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.maritalStatus || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.mobileNo || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.fathersName || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.nomineeName || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.nomineeRelation || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.qualification || '—'}</td>
+                        <td className="px-3 py-2.5 font-mono text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.aadharNo || '—'}</td>
+                        <td className="px-3 py-2.5 font-mono text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.panNo || '—'}</td>
+                        <td className="px-3 py-2.5 font-mono text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.esicNo || '—'}</td>
+                        <td className="px-3 py-2.5 font-mono text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.epfNo || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.bankName || '—'}</td>
+                        <td className="px-3 py-2.5 font-mono text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.ifscCode || '—'}</td>
+                        <td className="px-3 py-2.5 font-mono text-slate-700 border-r border-slate-100 whitespace-nowrap">{form.accountNo || '—'}</td>
+                        <td className="px-3 py-2.5 font-bold text-emerald-700 border-r border-slate-100 whitespace-nowrap">{form.salary || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-700 border-r border-slate-100 whitespace-nowrap">{(form.experienceYears ? form.experienceYears+'y ' : '')+(form.experienceMonths ? form.experienceMonths+'m' : '') || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-600 border-r border-slate-100 max-w-[200px]">{form.permanentAddress || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-600 border-r border-slate-100 max-w-[200px]">{form.presentAddress || '—'}</td>
+                        <td className="px-3 py-2.5 text-slate-400 whitespace-nowrap">{form.savedAt ? new Date(form.savedAt).toLocaleDateString('en-IN') : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </div>
           </div>
