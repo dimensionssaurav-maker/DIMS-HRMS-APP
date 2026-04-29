@@ -565,11 +565,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
         
         <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
           {/* ... existing controls ... */}
-          <div className="flex items-center gap-2">
-             <button onClick={() => setShowBioModal(true)} className="px-4 py-2 text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all text-xs font-bold flex items-center gap-2 shadow-md shadow-indigo-200">
-                <Database size={16} /><span>Biometric Sync</span>
-             </button>
-          </div>
+
 
           <div className="relative flex-1 md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
