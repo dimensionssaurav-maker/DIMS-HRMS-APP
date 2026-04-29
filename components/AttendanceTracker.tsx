@@ -675,33 +675,18 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                       </span>
                     </td>
 
-                    {/* Status — active badge + compact toggle row */}
+                    {/* Status — letter toggles only */}
                     <td className="px-3 py-2.5 border-r border-slate-100">
-                      <div className="flex flex-col gap-1.5">
-                        {/* Current status badge */}
-                        {activeS ? (
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold w-fit ${activeS.activeColor}`}>
-                            <activeS.icon size={12}/>{activeS.label}
-                          </span>
-                        ) : isFullHoliday ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold w-fit bg-purple-100 text-purple-700 border border-purple-200">
-                            <Moon size={12}/> Holiday
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 italic">Not marked</span>
-                        )}
-                        {/* Quick-change mini toggles */}
-                        <div className="flex gap-1">
-                          {statuses.map((s) => {
-                            const isActive = record ? record.status === s.id : (isFullHoliday && s.id === ('HOLIDAY' as AttendanceStatus));
-                            return (
-                              <button key={s.id} onClick={() => handleStatusChange(emp.id, s.id)} title={s.label}
-                                className={`w-7 h-6 rounded text-[9px] font-black transition-all border ${isActive ? s.activeColor + ' border-current' : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'}`}>
-                                {s.label.charAt(0)}
-                              </button>
-                            );
-                          })}
-                        </div>
+                      <div className="flex gap-1">
+                        {statuses.map((s) => {
+                          const isActive = record ? record.status === s.id : (isFullHoliday && s.id === ('HOLIDAY' as AttendanceStatus));
+                          return (
+                            <button key={s.id} onClick={() => handleStatusChange(emp.id, s.id)} title={s.label}
+                              className={`w-8 h-8 rounded-lg text-[11px] font-black transition-all border ${isActive ? s.activeColor + ' shadow-sm' : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'}`}>
+                              {s.label.charAt(0)}
+                            </button>
+                          );
+                        })}
                       </div>
                     </td>
 
