@@ -965,6 +965,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                   <tr className="bg-slate-800 text-white">
                     <th className="sticky left-0 z-20 bg-slate-800 px-3 py-3 text-left font-bold text-[11px] uppercase border-r border-slate-700 min-w-[70px]">EMP ID</th>
                     <th className="sticky left-[70px] z-20 bg-slate-800 px-3 py-3 text-left font-bold text-[11px] uppercase border-r border-slate-700 min-w-[130px]">Name</th>
+                    <th className="px-3 py-3 text-left font-bold text-[11px] uppercase border-r border-slate-700 min-w-[120px]">Department</th>
                     <th className="px-3 py-3 text-left font-bold text-[11px] uppercase border-r border-slate-700 min-w-[90px]">Date</th>
                     {monthDays.map(date => {
                       const d = new Date(date);
@@ -992,6 +993,9 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                           <td rowSpan={3} className={`sticky left-[70px] z-10 ${rowBg} px-3 py-2 border-r border-slate-200 border-b-2 border-b-slate-200 align-middle`}>
                             <p className="font-bold text-slate-800">{emp.name}</p>
                             <p className="text-[10px] text-slate-400">{emp.designation}</p>
+                          </td>
+                          <td rowSpan={3} className={`${rowBg} px-3 py-2 border-r border-slate-200 border-b-2 border-b-slate-200 align-middle`}>
+                            <span className="text-[11px] font-semibold text-slate-600">{(emp as any).department || emp.designation || '—'}</span>
                           </td>
                           <td className={`px-3 py-1.5 border-r border-slate-100 ${cellBorder} font-bold text-indigo-600 bg-indigo-50/40 text-[11px]`}>IN</td>
                           {monthDays.map(date => {
