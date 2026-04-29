@@ -1,7 +1,8 @@
 import { db } from "../firebase";
+import JoiningFormParser from './JoiningFormParser';
 import { collection, addDoc } from "firebase/firestore";
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, UserPlus, Edit2, Trash2, Building2, ArrowUpDown, ArrowUp, ArrowDown, AlertCircle, X, Save, Clock, Users, Wifi, ClipboardCopy, ArrowRight, Briefcase, IndianRupee, MapPin, Share2, Percent, MoreHorizontal, UserX, UserCheck, Calendar, RotateCcw, User, Camera, Check, FileText, Download } from 'lucide-react';
+import { Search, Upload, UserPlus, Edit2, Trash2, Building2, ArrowUpDown, ArrowUp, ArrowDown, AlertCircle, X, Save, Clock, Users, Wifi, ClipboardCopy, ArrowRight, Briefcase, IndianRupee, MapPin, Share2, Percent, MoreHorizontal, UserX, UserCheck, Calendar, RotateCcw, User, Camera, Check, FileText, Download } from 'lucide-react';
 import { Employee, Shift, PayrollConfig } from '../types';
 
 interface Props {
@@ -31,6 +32,7 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
   // Modals State
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showJoiningForm, setShowJoiningForm] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -354,6 +356,9 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
           
           <button onClick={() => { setShowImportModal(true); setImportStep('input'); }} className="bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
             <Users size={18} /> Bulk Import
+          </button>
+          <button onClick={() => setShowJoiningForm(true)} className="bg-white border border-indigo-200 text-indigo-600 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-50 transition-all">
+            <Upload size={16} /> Upload Joining Form
           </button>
           <button onClick={onAdd} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
             <UserPlus size={18} /> Add Employee
@@ -813,6 +818,12 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
              </div>
           </div>
         </div>
+      )}
+      {showJoiningForm && (
+        <JoiningFormParser
+          onClose={() => setShowJoiningForm(false)}
+          onSaved={(_code, _name) => { setShowJoiningForm(false); }}
+        />
       )}
     </div>
   );

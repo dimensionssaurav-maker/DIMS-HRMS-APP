@@ -115,3 +115,71 @@ export function createHRChat(context: any) {
     clearHistory: () => { history.length = 0; }
   };
 }
+
+export async function parseJoiningForm(base64Data: string, mimeType: string): Promise<Record<string, string>> {
+  const key = getKey();
+  if (!key) throw new Error('VITE_GEMINI_KEY not configured');
+
+  const prompt = `This is a filled Employee Joining Form. Extract ALL filled-in values and return ONLY a valid JSON object with exactly these keys (use empty string "" for any blank/unfilled field):
+{
+  "source": "",
+  "employeeCode": "",
+  "name": "",
+  "joiningDate": "",
+  "department": "",
+  "designation": "",
+  "experienceYears": "",
+  "experienceMonths": "",
+  "esicNo": "",
+  "epfNo": "",
+  "aadharNo": "",
+  "panNo": "",
+  "fathersName": "",
+  "dateOfBirth": "",
+  "gender": "",
+  "maritalStatus": "",
+  "nomineeName": "",
+  "nomineeRelation": "",
+  "qualification": "",
+  "mobileNo": "",
+  "permanentAddress": "",
+  "presentAddress": "",
+  "bankName": "",
+  "ifscCode": "",
+  "accountNo": "",
+  "salary": ""
+}
+Return ONLY the JSON, no markdown, no explanation.`;
+
+  const body = {
+    contents: [{
+      role: 'user',
+      parts: [
+        { inline_data: { mime_type: mimeType, data: base64Data } },
+        { text: prompt }
+      ]
+    }],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
+  };
+
+  const resp = await fetch(GEMINI_API + '?key=' + key, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error('Gemini ' + resp.status + ': ' + err.substring(0, 200));
+  }
+
+  const json = await resp.json();
+  let text = json.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+  // Strip markdown code fences if present
+  text = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('Could not parse AI response: ' + text.substring(0, 100));
+  }
+}
