@@ -62,7 +62,7 @@ export async function getHRInsights(data: any): Promise<string> {
   try {
     return await callGemini(
       [{ role: 'user', parts: [{ text: 'Analyze this HR data: ' + JSON.stringify(data).substring(0, 3000) }] }],
-      'You are ZenAI, an HR analytics expert for DIMS HRMS factory management system. Give exactly 2 key trends and 2 actionable recommendations using bullet points. Be concise and specific with numbers from the data. Under 100 words total.',
+      'You are ZenAI, an HR analytics expert for DIMS HRMS. Return EXACTLY 5 bullet points (use • symbol). Format: • [finding with specific number from data]. Cover: attendance rate, top absent/late issue, payroll highlight, headcount note, one action tip. Each bullet max 15 words. No intro, no outro, no headers.',
       300
     );
   } catch (err: any) {

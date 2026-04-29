@@ -111,10 +111,10 @@ const Dashboard: React.FC<Props> = ({
   }, [data, selectedMonth, selectedYear, monthlyExpenses, totalPayroll, setCachedInsights]);
 
   useEffect(() => {
-    if (!cachedInsights) {
+    if (!cachedInsights && data?.employees?.length > 0) {
       fetchInsights();
     }
-  }, [fetchInsights, cachedInsights]);
+  }, [fetchInsights, cachedInsights, data?.employees?.length]);
 
   const handleCopy = () => {
     if (!cachedInsights) return;
@@ -258,13 +258,32 @@ const Dashboard: React.FC<Props> = ({
                 </div>
               ) : (
                 <>
-                  <p className="text-indigo-50 leading-relaxed text-sm italic">
-                    "{cachedInsights}"
-                  </p>
+                  {cachedInsights && !insightError ? (
+                    <ul className="space-y-2">
+                      {cachedInsights
+                        .split(/\n/)
+                        .map(l => l.replace(/^[•\-\*]\s*/, '').trim())
+                        .filter(l => l.length > 4)
+                        .slice(0, 5)
+                        .map((point, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-indigo-50">
+                            <span className="mt-1 w-1.5 h-1.5 rounded-full bg-amber-300 shrink-0"/>
+                            <span>{point}</span>
+                          </li>
+                        ))
+                      }
+                    </ul>
+                  ) : (
+                    <p className="text-indigo-200 text-sm">
+                      {data?.employees?.length === 0
+                        ? 'Load employee data first, then insights will appear.'
+                        : (cachedInsights || 'Click refresh to generate insights.')}
+                    </p>
+                  )}
                   {insightError && (
-                    <button 
+                    <button
                       onClick={fetchInsights}
-                      className="flex items-center gap-2 text-xs font-bold text-amber-300 hover:text-white transition-colors bg-white/10 px-3 py-1.5 rounded-lg"
+                      className="flex items-center gap-2 text-xs font-bold text-amber-300 hover:text-white transition-colors bg-white/10 px-3 py-1.5 rounded-lg mt-2"
                     >
                       <RefreshCw size={14} /> Try Again
                     </button>
