@@ -326,9 +326,23 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
 
   const handleConfirmImport = () => {
      if (parsedNewEmployees.length === 0) return;
-     const newEmployees: Employee[] = parsedNewEmployees.map(p => ({
-        id: p.id!,           // CSV ID used as display ID (will be overwritten by Firebase doc ID after save)
-        employeeCode: p.id!, // Preserve original CSV ID as a permanent searchable field
+     const activeEmps = employees.filter(e => e.status === 'Active' || !e.status);
+     const duplicates: string[] = [];
+     const newEmployees: Employee[] = parsedNewEmployees
+       .filter(p => {
+         const code = (p.id || '').trim().toLowerCase();
+         const name = (p.name || '').trim().toLowerCase();
+         const dupCode = code && activeEmps.find(e => (e.employeeCode || e.id || '').trim().toLowerCase() === code);
+         const dupName = name && activeEmps.find(e => (e.name || '').trim().toLowerCase() === name);
+         if (dupCode || dupName) {
+           duplicates.push(`${p.id} – ${p.name} (already exists)`);
+           return false;
+         }
+         return true;
+       })
+       .map(p => ({
+        id: p.id!,
+        employeeCode: p.id!,
         name: p.name!,
         department: defaultImportSettings.department,
         designation: defaultImportSettings.designation,
@@ -340,7 +354,12 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
         joiningDate: new Date().toISOString().split('T')[0],
         status: 'Active'
      }));
-     onBulkAdd(newEmployees);
+     if (duplicates.length > 0) {
+       alert(`⚠️ ${duplicates.length} duplicate(s) skipped:\n\n${duplicates.join('\n')}`);
+     }
+     if (newEmployees.length > 0) {
+       onBulkAdd(newEmployees);
+     }
      setShowImportModal(false);
      setImportStep('input');
      setImportText('');

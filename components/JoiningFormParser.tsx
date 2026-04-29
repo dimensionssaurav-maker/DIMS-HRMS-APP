@@ -108,24 +108,6 @@ const JoiningFormParser: React.FC<Props> = ({ onClose, onSaved }) => {
         savedAt: new Date().toISOString(),
         fileName,
       });
-      // Also create/update basic employee record
-      await addData('employees', {
-        id: docId,
-        empCode: docId,
-        employeeCode: extracted.employeeCode || docId,
-        name: extracted.name || '',
-        department: extracted.department || '',
-        designation: extracted.designation || '',
-        joiningDate: extracted.joiningDate || '',
-        source: extracted.source || '',
-        mobileNo: extracted.mobileNo || '',
-        status: 'Active',
-        salaryType: 'Monthly',
-        monthlySalary: Number(extracted.salary?.replace(/[^0-9]/g, '')) || 0,
-        dailyWage: 0,
-        monthlyBase: Number(extracted.salary?.replace(/[^0-9]/g, '')) || 0,
-        isOtAllowed: false,
-      });
       setStep('done');
       onSaved(extracted.employeeCode || docId, extracted.name || docId);
     } catch (err: any) {

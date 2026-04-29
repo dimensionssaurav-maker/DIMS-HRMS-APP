@@ -308,6 +308,24 @@ export default function App() {
   // ── EMPLOYEE handlers ──────────────────────────────────────────────────
   const handleAddEmployee = async (emp: Employee) => {
     try {
+      // Duplicate check — same employee code or same name in active employees
+      const empCode = (emp.employeeCode || emp.id || '').trim().toLowerCase();
+      const empName = (emp.name || '').trim().toLowerCase();
+      const activeEmps = employees.filter(e => e.status === 'Active' || !e.status);
+      const dupCode = empCode && activeEmps.find(e =>
+        (e.employeeCode || e.id || '').trim().toLowerCase() === empCode
+      );
+      const dupName = empName && activeEmps.find(e =>
+        (e.name || '').trim().toLowerCase() === empName
+      );
+      if (dupCode) {
+        alert(`⚠️ Duplicate Employee!\n\nAn employee with code "${emp.employeeCode || emp.id}" already exists: ${dupCode.name}\n\nPlease use a different employee code.`);
+        return;
+      }
+      if (dupName) {
+        const confirm = window.confirm(`⚠️ Possible Duplicate!\n\nAn employee named "${emp.name}" already exists (Code: ${dupName.employeeCode || dupName.id}).\n\nDo you still want to add this employee?`);
+        if (!confirm) return;
+      }
       const empRef = await addData("employees", emp);
       const savedEmp = { ...emp, id: empRef.id };
       setEmployees(prev => [...prev, savedEmp]);
