@@ -22,6 +22,7 @@ type SortDirection = 'asc' | 'desc' | null;
 const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = [], payrollConfig, onAdd, onBulkAdd, onDelete, onUpdate }) => {
   const [activeTab, setActiveTab] = useState<'active' | 'left' | 'deleted'>('active');
   const [searchTerm, setSearchTerm] = useState('');
+  const [deptFilter, setDeptFilter] = useState('All');
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({
     key: 'name',
     direction: null,
@@ -112,12 +113,17 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
     } else {
         items = items.filter(e => e.status === 'Deleted');
     }
+    if (deptFilter && deptFilter !== 'All') {
+      items = items.filter(emp => (emp.department ?? '') === deptFilter);
+    }
     if (searchTerm) {
       items = items.filter(emp => 
         (emp.name ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (emp.designation ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (emp.department ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (emp.id ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+        (emp.id ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (emp.mobileNo ?? '').includes(searchTerm) ||
+        (emp.source ?? '').toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     if (sortConfig.key && sortConfig.direction) {
@@ -132,7 +138,7 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
       });
     }
     return items;
-  }, [employees, searchTerm, sortConfig, activeTab]);
+  }, [employees, searchTerm, sortConfig, activeTab, deptFilter]);
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) setSelectedIds(sortedEmployees.map(e => e.id));
@@ -401,58 +407,101 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
             ))}
         </div>
 
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-            <div className="relative max-w-md w-full">
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <input type="text" placeholder="Filter by name, ID or role..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm" />
+                <input type="text" placeholder="Search name, ID, mobile, source…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm" />
             </div>
+            <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm">
+                <option value="All">All Departments</option>
+                {departments.filter(d => d !== 'All Departments').map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <span className="text-xs text-slate-400 font-bold ml-auto">{sortedEmployees.length} employee{sortedEmployees.length !== 1 ? 's' : ''}</span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left whitespace-nowrap">
+          <table className="w-full text-left" style={{minWidth:'900px'}}>
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="px-6 py-4 w-12">
+              <tr className="bg-slate-800 text-white">
+                <th className="px-4 py-3 w-10">
                   <input type="checkbox" checked={isAllSelected} ref={i => { if (i) i.indeterminate = isIndeterminate; }} onChange={handleSelectAll} className="w-4 h-4 rounded border-slate-300 text-indigo-600 accent-indigo-600" />
                 </th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100" onClick={() => handleSort('name')}>
-                  <div className="flex items-center gap-2">Employee {getSortIcon('name')}</div>
+                <th className="px-3 py-3 text-[10px] font-black uppercase tracking-wider text-slate-400 w-8">#</th>
+                <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('name')}>
+                  <div className="flex items-center gap-1">Employee {getSortIcon('name')}</div>
                 </th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Designation</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Department</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Details</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Action</th>
+                <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('department')}>
+                  <div className="flex items-center gap-1">Dept {getSortIcon('department')}</div>
+                </th>
+                <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('designation')}>
+                  <div className="flex items-center gap-1">Designation {getSortIcon('designation')}</div>
+                </th>
+                <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider">Source</th>
+                <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider">Mobile</th>
+                <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('joiningDate')}>
+                  <div className="flex items-center gap-1">Joining {getSortIcon('joiningDate')}</div>
+                </th>
+                <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider">Salary</th>
+                <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-center">OT</th>
+                <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-100">
               {sortedEmployees.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-20 text-center text-slate-400 italic">No matching records found.</td></tr>
-              ) : sortedEmployees.map((emp) => (
-                <tr key={emp.id} className={`hover:bg-slate-50 transition-colors group ${selectedIds.includes(emp.id) ? 'bg-indigo-50/50' : ''}`}>
-                  <td className="px-6 py-4"><input type="checkbox" checked={selectedIds.includes(emp.id)} onChange={() => handleSelect(emp.id)} className="w-4 h-4 rounded border-slate-300 text-indigo-600 accent-indigo-600" /></td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                          {emp.avatar ? <img src={emp.avatar} className="w-10 h-10 rounded-full object-cover border border-slate-200" alt="" /> : <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500"><User size={20} /></div>}
-                          {emp.status === 'Left' && <div className="absolute -bottom-1 -right-1 bg-red-500 text-white p-0.5 rounded-full border border-white"><UserX size={10} /></div>}
-                          {emp.status === 'Deleted' && <div className="absolute -bottom-1 -right-1 bg-slate-500 text-white p-0.5 rounded-full border border-white"><Trash2 size={10} /></div>}
+                <tr><td colSpan={11} className="px-6 py-20 text-center text-slate-400 italic">No matching records found.</td></tr>
+              ) : sortedEmployees.map((emp, rowIdx) => (
+                <tr key={emp.id} className={`transition-colors group ${selectedIds.includes(emp.id) ? 'bg-indigo-50' : rowIdx % 2 === 0 ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/60 hover:bg-slate-100/60'}`}>
+                  <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.includes(emp.id)} onChange={() => handleSelect(emp.id)} className="w-4 h-4 rounded border-slate-300 text-indigo-600 accent-indigo-600" /></td>
+                  <td className="px-3 py-3 text-xs text-slate-400 font-bold">{rowIdx + 1}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative shrink-0">
+                          {emp.avatar ? <img src={emp.avatar} className="w-9 h-9 rounded-full object-cover border border-slate-200" alt="" /> : <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-black text-sm">{(emp.name || '?')[0].toUpperCase()}</div>}
+                          {emp.status === 'Left' && <div className="absolute -bottom-0.5 -right-0.5 bg-red-500 text-white p-0.5 rounded-full border border-white"><UserX size={8} /></div>}
+                          {emp.status === 'Deleted' && <div className="absolute -bottom-0.5 -right-0.5 bg-slate-500 text-white p-0.5 rounded-full border border-white"><Trash2 size={8} /></div>}
                       </div>
-                      <div><p className={`font-bold ${emp.status !== 'Active' ? 'text-slate-500' : 'text-slate-800'}`}>{emp.name}</p><p className="text-[10px] text-slate-400 font-mono font-bold uppercase">{emp.employeeCode || emp.id}</p></div>
+                      <div>
+                        <p className={`text-sm font-bold leading-tight ${emp.status !== 'Active' ? 'text-slate-400' : 'text-slate-800'}`}>{emp.name}</p>
+                        <p className="text-[10px] text-indigo-500 font-mono font-bold">{emp.employeeCode || emp.id}</p>
+                      </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm font-medium text-slate-600">{emp.designation}</td>
-                  <td className="px-6 py-4"><span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase ${emp.status !== 'Active' ? 'bg-slate-100 text-slate-500' : 'bg-indigo-50 text-indigo-600'}`}>{emp.department}</span></td>
-                  <td className="px-6 py-4 text-right">
-                    {activeTab === 'active' ? (
-                        <p className="font-bold text-slate-800 text-sm">₹{emp.salaryType === 'Monthly' ? emp.monthlySalary.toLocaleString() : emp.dailyWage}/<span className="text-[10px] text-slate-400 font-medium uppercase">{emp.salaryType === 'Monthly' ? 'mo' : 'day'}</span></p>
-                    ) : activeTab === 'left' ? (
-                        <p className="text-xs font-bold text-red-500">Left: {emp.leavingDate}</p>
-                    ) : <span className="text-xs text-slate-300 font-bold uppercase italic">In Bin</span>}
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase whitespace-nowrap ${emp.status !== 'Active' ? 'bg-slate-100 text-slate-400' : 'bg-indigo-100 text-indigo-700'}`}>{emp.department || '—'}</span>
                   </td>
-                  <td className="px-6 py-4 text-right relative">
-                    <button onClick={() => setOpenActionId(openActionId === emp.id ? null : emp.id)} className={`p-2 rounded-lg transition-colors action-trigger ${openActionId === emp.id ? 'bg-slate-200 text-slate-800' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}><MoreHorizontal size={18} /></button>
+                  <td className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap">{emp.designation || <span className="text-slate-300">—</span>}</td>
+                  <td className="px-4 py-3">
+                    {emp.source ? <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-md text-[10px] font-black">{emp.source}</span> : <span className="text-slate-300 text-xs">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-xs font-mono text-slate-600 whitespace-nowrap">{emp.mobileNo || <span className="text-slate-300">—</span>}</td>
+                  <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
+                    {emp.joiningDate ? <span className="font-semibold">{emp.joiningDate}</span> : <span className="text-slate-300">—</span>}
+                    {activeTab === 'left' && emp.leavingDate && <p className="text-[10px] text-red-500 font-bold mt-0.5">Left: {emp.leavingDate}</p>}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {activeTab === 'deleted' ? (
+                      <span className="text-xs text-slate-300 italic">—</span>
+                    ) : (
+                      <div>
+                        <p className="text-sm font-black text-slate-800">₹{(emp.salaryType === 'Monthly' ? emp.monthlySalary : emp.dailyWage || 0).toLocaleString()}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">{emp.salaryType === 'Monthly' ? '/month' : '/day'}</p>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {emp.isOtAllowed
+                      ? <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full">YES</span>
+                      : <span className="bg-slate-100 text-slate-400 text-[10px] font-black px-2 py-0.5 rounded-full">NO</span>}
+                  </td>
+                  <td className="px-4 py-3 text-center relative">
+                    <div className="flex items-center justify-center gap-1">
+                      {activeTab !== 'deleted' && (
+                        <button onClick={(e) => handleEditClick(e, emp)} className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors" title="Edit"><Edit2 size={14} /></button>
+                      )}
+                      <button onClick={() => setOpenActionId(openActionId === emp.id ? null : emp.id)} className={`p-1.5 rounded-lg transition-colors action-trigger ${openActionId === emp.id ? 'bg-slate-200 text-slate-800' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`} title="More"><MoreHorizontal size={14} /></button>
+                    </div>
                     {openActionId === emp.id && (
-                      <div className="dropdown-menu absolute right-10 top-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 z-[100] overflow-hidden animate-in fade-in zoom-in-95 origin-top-right">
+                      <div className="dropdown-menu absolute right-2 top-10 w-48 bg-white rounded-xl shadow-xl border border-slate-100 z-[100] overflow-hidden animate-in fade-in zoom-in-95 origin-top-right">
                            {activeTab !== 'deleted' ? (
                                <>
                                    <button onClick={(e) => handleEditClick(e, emp)} className="w-full text-left px-4 py-3 text-sm font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 flex items-center gap-2"><Edit2 size={16} /> Edit Details</button>
