@@ -604,111 +604,152 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
       </div>
 
       {viewMode === 'daily' && (
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filteredEmployees.length === 0 ? (
-          <div className="col-span-full py-12 text-center text-slate-400 font-medium">No employees match your search.</div>
-        ) : filteredEmployees.map((emp) => {
-          const record = getRecord(emp.id);
-          const duration = calculateDuration(record?.checkIn, record?.checkOut);
-          const { isSundaySchedule, sundayConfig } = getShiftConfigForDate(emp, currentDate);
-          
-          const isSundayOff = isSunday && (!isSundaySchedule || !sundayConfig?.enabled);
-          const isFullHoliday = !record && (
-              (activeHoliday && activeHoliday.type === 'Full') || 
-              isSundayOff
-          );
-          
-          return (
-            <div key={emp.id} className={`p-5 rounded-2xl border shadow-sm hover:border-indigo-200 transition-all group relative overflow-hidden ${isFullHoliday ? 'bg-purple-50/50 border-purple-100' : 'bg-white border-slate-100'}`}>
-              
-              {/* Holiday Overlay/Badge */}
-              {isFullHoliday && (
-                  <div className="absolute top-0 right-0 bg-purple-100 text-purple-700 text-[10px] font-bold px-3 py-1 rounded-bl-xl border-l border-b border-purple-200 z-10">
-                      {isSundayOff ? 'Weekly Off' : activeHoliday?.name}
-                  </div>
-              )}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-800 text-white text-[11px] uppercase tracking-wide">
+                <th className="sticky left-0 z-20 bg-slate-800 px-4 py-3 text-left font-bold min-w-[200px] border-r border-slate-700">Employee</th>
+                <th className="px-3 py-3 text-left font-bold min-w-[260px] border-r border-slate-700">Status</th>
+                <th className="px-3 py-3 text-center font-bold min-w-[110px] border-r border-slate-700">In Time</th>
+                <th className="px-3 py-3 text-center font-bold min-w-[110px] border-r border-slate-700">Out Time</th>
+                <th className="px-3 py-3 text-center font-bold min-w-[90px] border-r border-slate-700">Duration</th>
+                <th className="px-3 py-3 text-center font-bold min-w-[90px] border-r border-slate-700">OT Hrs</th>
+                <th className="px-3 py-3 text-left font-bold min-w-[120px]">Flags</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredEmployees.length === 0 ? (
+                <tr><td colSpan={7} className="py-16 text-center text-slate-400 font-medium text-sm">No employees match your search.</td></tr>
+              ) : filteredEmployees.map((emp, idx) => {
+                const record = getRecord(emp.id);
+                const duration = calculateDuration(record?.checkIn, record?.checkOut);
+                const { isSundaySchedule, sundayConfig } = getShiftConfigForDate(emp, currentDate);
+                const isSundayOff = isSunday && (!isSundaySchedule || !sundayConfig?.enabled);
+                const isFullHoliday = !record && (
+                  (activeHoliday && activeHoliday.type === 'Full') || isSundayOff
+                );
+                const rowBg = isFullHoliday
+                  ? 'bg-purple-50/40'
+                  : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
 
-              {/* Sunday Work Indicator */}
-              {isSunday && isSundaySchedule && sundayConfig?.enabled && (
-                  <div className="absolute top-0 right-0 bg-orange-100 text-orange-700 text-[10px] font-bold px-3 py-1 rounded-bl-xl border-l border-b border-orange-200 z-10 flex items-center gap-1">
-                      <Zap size={10} /> Sunday Work
-                  </div>
-              )}
-
-              <div className="flex items-center gap-4 mb-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-bold text-slate-800">{emp.name}</h4>
-                    <span className="text-[10px] font-bold text-slate-300">#{emp.id}</span>
-                  </div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">{emp.designation}</p>
-                </div>
-                <div className="ml-auto flex flex-col items-end gap-1">
-                    {record?.lateMinutes && record.lateMinutes > 0 && (
-                        <span className="bg-rose-100 text-rose-600 px-2 py-1 rounded-lg text-[10px] font-bold uppercase animate-pulse">Late: {record.lateMinutes}m</span>
-                    )}
-                    {record?.earlyMinutes && record.earlyMinutes > 0 && (
-                        <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded-lg text-[10px] font-bold uppercase">Early: {record.earlyMinutes}m</span>
-                    )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 gap-2 mb-4">
-                {statuses.map((s) => {
-                  const Icon = s.icon;
-                  const isActive = record ? record.status === s.id : (isFullHoliday && s.id === 'HOLIDAY' as AttendanceStatus);
-                  return (
-                    <button 
-                      key={s.id}
-                      onClick={() => handleStatusChange(emp.id, s.id)}
-                      className={`flex flex-col items-center justify-center p-2.5 rounded-xl border border-transparent transition-all hover:scale-105 ${isActive ? s.activeColor : s.inactiveColor + ' opacity-60 hover:opacity-100'}`}
-                      title={s.label}
-                    >
-                      <Icon size={18} />
-                      <span className="text-[10px] font-bold mt-1 uppercase tracking-tighter">{s.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className={`rounded-xl p-3 mb-4 border ${isFullHoliday ? 'bg-white/50 border-purple-100' : 'bg-slate-50 border-slate-100'}`}>
-                 <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
-                        <Clock size={10} /> Shift Timing
-                    </span>
-                    {duration && (
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${duration.totalHours > 9 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                            {duration.hours}h {duration.minutes}m
+                return (
+                  <tr key={emp.id} className={`border-b border-slate-100 hover:bg-indigo-50/20 transition-colors ${rowBg}`}>
+                    {/* Employee */}
+                    <td className={`sticky left-0 z-10 px-4 py-3 border-r border-slate-100 ${rowBg}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${isFullHoliday ? 'bg-purple-100 text-purple-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                          {emp.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-800 text-[12px]">{emp.name}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="font-mono text-[10px] text-slate-400">{emp.employeeCode || emp.id}</span>
+                            {isFullHoliday && (
+                              <span className="text-[9px] font-bold text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded-full">
+                                {isSundayOff ? 'Weekly Off' : activeHoliday?.name}
+                              </span>
+                            )}
+                            {isSunday && isSundaySchedule && sundayConfig?.enabled && (
+                              <span className="text-[9px] font-bold text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                <Zap size={8}/> Sunday Work
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-400">{emp.designation}</p>
+                        </div>
+                      </div>
+                    </td>
+                    {/* Status */}
+                    <td className="px-3 py-3 border-r border-slate-100">
+                      <div className="flex gap-1 flex-wrap">
+                        {statuses.map((s) => {
+                          const Icon = s.icon;
+                          const isActive = record ? record.status === s.id : (isFullHoliday && s.id === ('HOLIDAY' as AttendanceStatus));
+                          return (
+                            <button key={s.id} onClick={() => handleStatusChange(emp.id, s.id)} title={s.label}
+                              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${isActive ? s.activeColor + ' shadow-sm' : s.inactiveColor + ' opacity-40 hover:opacity-80 border-transparent'}`}>
+                              <Icon size={12}/><span>{s.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </td>
+                    {/* In Time */}
+                    <td className="px-3 py-3 border-r border-slate-100 text-center">
+                      <input type="time" value={record?.checkIn || ''} onChange={(e) => handleTimeChange(emp.id, 'checkIn', e.target.value)} disabled={isFullHoliday}
+                        className={`border rounded-xl px-2 py-1.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-300 w-28 text-center transition-all ${record?.lateMinutes && record.lateMinutes > 0 ? 'bg-rose-50 border-rose-300 text-rose-700' : 'bg-slate-50 border-slate-200'} ${isFullHoliday ? 'opacity-30 cursor-not-allowed' : 'hover:border-indigo-300'}`}
+                      />
+                      {record?.lateMinutes && record.lateMinutes > 0 && (
+                        <div className="text-[9px] text-rose-500 font-bold mt-0.5">+{record.lateMinutes}m late</div>
+                      )}
+                    </td>
+                    {/* Out Time */}
+                    <td className="px-3 py-3 border-r border-slate-100 text-center">
+                      <input type="time" value={record?.checkOut || ''} onChange={(e) => handleTimeChange(emp.id, 'checkOut', e.target.value)} disabled={isFullHoliday}
+                        className={`border rounded-xl px-2 py-1.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-300 w-28 text-center transition-all ${record?.earlyMinutes && record.earlyMinutes > 0 ? 'bg-orange-50 border-orange-300 text-orange-700' : 'bg-slate-50 border-slate-200'} ${isFullHoliday ? 'opacity-30 cursor-not-allowed' : 'hover:border-indigo-300'}`}
+                      />
+                      {record?.earlyMinutes && record.earlyMinutes > 0 && (
+                        <div className="text-[9px] text-orange-500 font-bold mt-0.5">-{record.earlyMinutes}m early</div>
+                      )}
+                    </td>
+                    {/* Duration */}
+                    <td className="px-3 py-3 border-r border-slate-100 text-center">
+                      {duration ? (
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold ${duration.totalHours >= 9 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          <Clock size={11}/>{duration.hours}h {duration.minutes}m
                         </span>
-                    )}
-                 </div>
-                 <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><LogIn size={10} /> In</label>
-                        <input type="time" value={record?.checkIn || ''} onChange={(e) => handleTimeChange(emp.id, 'checkIn', e.target.value)} disabled={isFullHoliday} className={`w-full border rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 ${record?.lateMinutes && record.lateMinutes > 0 ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-200'} ${isFullHoliday ? 'opacity-50 cursor-not-allowed' : ''}`} />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><LogOut size={10} /> Out</label>
-                        <input type="time" value={record?.checkOut || ''} onChange={(e) => handleTimeChange(emp.id, 'checkOut', e.target.value)} disabled={isFullHoliday} className={`w-full border rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 ${record?.earlyMinutes && record.earlyMinutes > 0 ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'} ${isFullHoliday ? 'opacity-50 cursor-not-allowed' : ''}`} />
-                    </div>
-                 </div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-50 flex items-center justify-between">
-                <div className="flex flex-col">
-                  <label className={`text-xs font-semibold uppercase ${emp.isOtAllowed ? 'text-slate-500' : 'text-slate-300'}`}>Overtime</label>
-                  {!emp.isOtAllowed && <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium"><Lock size={10} /> Not Eligible</span>}
-                </div>
-                <div className="flex items-center gap-2">
-                  <input type="number" min="0" max="12" step="0.5" disabled={!emp.isOtAllowed} value={emp.isOtAllowed ? (record?.overtimeHours || 0) : 0} onChange={(e) => handleOvertimeChange(emp.id, e.target.value)} placeholder="0" className={`w-16 border rounded-lg p-1 text-center text-sm font-bold outline-none transition-colors ${emp.isOtAllowed ? 'bg-slate-50 border-slate-100 text-indigo-600 focus:ring-1 focus:ring-indigo-500' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`} />
-                  <span className={`text-xs ${emp.isOtAllowed ? 'text-slate-400' : 'text-slate-300'}`}>hrs</span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+                      ) : <span className="text-slate-300 text-sm">—</span>}
+                    </td>
+                    {/* OT */}
+                    <td className="px-3 py-3 border-r border-slate-100 text-center">
+                      {emp.isOtAllowed ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <input type="number" min="0" max="12" step="0.5"
+                            value={record?.overtimeHours || 0}
+                            onChange={(e) => handleOvertimeChange(emp.id, e.target.value)}
+                            className="w-16 border border-indigo-200 bg-indigo-50 rounded-xl p-1.5 text-center text-xs font-bold text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-300"
+                          />
+                          <span className="text-[10px] text-slate-400 font-medium">h</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-1 text-slate-300">
+                          <Lock size={10}/><span className="text-[10px] font-medium">N/A</span>
+                        </div>
+                      )}
+                    </td>
+                    {/* Flags */}
+                    <td className="px-3 py-3">
+                      <div className="flex flex-col gap-1">
+                        {record?.lateMinutes && record.lateMinutes > 0 ? (
+                          <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-600 px-2 py-1 rounded-lg text-[10px] font-bold">
+                            <AlertTriangle size={10}/> Late {record.lateMinutes}m
+                          </span>
+                        ) : null}
+                        {record?.earlyMinutes && record.earlyMinutes > 0 ? (
+                          <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-600 px-2 py-1 rounded-lg text-[10px] font-bold">
+                            <LogOut size={10}/> Early {record.earlyMinutes}m
+                          </span>
+                        ) : null}
+                        {!record?.lateMinutes && !record?.earlyMinutes && record?.status === ('PRESENT' as AttendanceStatus) && (
+                          <span className="inline-flex items-center gap-1 text-emerald-500 text-[10px] font-bold">
+                            <CheckCircle2 size={10}/> On Time
+                          </span>
+                        )}
+                        {isFullHoliday && (
+                          <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-600 px-2 py-1 rounded-lg text-[10px] font-bold">
+                            <Moon size={10}/> Off Day
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-
       )}
 
       {/* ── MONTHLY REPORT VIEW ─────────────────────────────────── */}
@@ -851,7 +892,6 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                               ) : (
                                 <div className="py-1.5 px-0 relative">
                                   <span className={`text-xs ${labelColor}`}>{label}</span>
-                                  {r?.checkIn && <div className="text-[8px] text-slate-400 leading-none">{r.checkIn}</div>}
                                   {r?.lateMinutes && r.lateMinutes > 0 && <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-orange-400"></div>}
                                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Edit3 size={10} className="text-indigo-400" />
