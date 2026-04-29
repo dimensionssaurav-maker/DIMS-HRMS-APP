@@ -565,17 +565,8 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
         
         <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
           {/* ... existing controls ... */}
-          <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
-             <input type="file" ref={fileInputRef} onChange={doFileChange} accept=".csv" className="hidden" />
-             <button onClick={doDownloadTemplate} className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-white rounded-lg transition-all text-xs font-bold flex items-center gap-2">
-                <FileDown size={16} /><span className="hidden sm:inline">Template</span>
-             </button>
-             <div className="w-px h-6 bg-slate-200"></div>
-             <button onClick={handleImportClick} className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-all text-xs font-bold flex items-center gap-2">
-                <Upload size={16} /><span>Import CSV</span>
-             </button>
-             <div className="w-px h-6 bg-slate-200"></div>
-             <button onClick={() => setShowBioModal(true)} className="p-2 text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-all text-xs font-bold flex items-center gap-2 shadow-md shadow-indigo-200">
+          <div className="flex items-center gap-2">
+             <button onClick={() => setShowBioModal(true)} className="px-4 py-2 text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all text-xs font-bold flex items-center gap-2 shadow-md shadow-indigo-200">
                 <Database size={16} /><span>Biometric Sync</span>
              </button>
           </div>
