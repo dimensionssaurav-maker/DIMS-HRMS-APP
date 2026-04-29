@@ -120,36 +120,10 @@ export async function parseJoiningForm(base64Data: string, mimeType: string): Pr
   const key = getKey();
   if (!key) throw new Error('VITE_GEMINI_KEY not configured');
 
-  const prompt = `This is a filled Employee Joining Form. Extract ALL filled-in values and return ONLY a valid JSON object with exactly these keys (use empty string "" for any blank/unfilled field):
-{
-  "source": "",
-  "employeeCode": "",
-  "name": "",
-  "joiningDate": "",
-  "department": "",
-  "designation": "",
-  "experienceYears": "",
-  "experienceMonths": "",
-  "esicNo": "",
-  "epfNo": "",
-  "aadharNo": "",
-  "panNo": "",
-  "fathersName": "",
-  "dateOfBirth": "",
-  "gender": "",
-  "maritalStatus": "",
-  "nomineeName": "",
-  "nomineeRelation": "",
-  "qualification": "",
-  "mobileNo": "",
-  "permanentAddress": "",
-  "presentAddress": "",
-  "bankName": "",
-  "ifscCode": "",
-  "accountNo": "",
-  "salary": ""
-}
-Return ONLY the JSON, no markdown, no explanation.`;
+  const prompt = `This is a filled Employee Joining Form. Extract ALL filled-in values.
+Return ONLY a valid JSON object with exactly these keys (use "" for blank fields):
+{"source":"","employeeCode":"","name":"","joiningDate":"","department":"","designation":"","experienceYears":"","experienceMonths":"","esicNo":"","epfNo":"","aadharNo":"","panNo":"","fathersName":"","dateOfBirth":"","gender":"","maritalStatus":"","nomineeName":"","nomineeRelation":"","qualification":"","mobileNo":"","permanentAddress":"","presentAddress":"","bankName":"","ifscCode":"","accountNo":"","salary":""}
+Rules: Output ONLY the JSON object. No markdown. No explanation. No extra text before or after.`;
 
   const body = {
     contents: [{
@@ -159,7 +133,7 @@ Return ONLY the JSON, no markdown, no explanation.`;
         { text: prompt }
       ]
     }],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
+    generationConfig: { temperature: 0.1, maxOutputTokens: 2000 }
   };
 
   const resp = await fetch(GEMINI_API + '?key=' + key, {
@@ -174,12 +148,27 @@ Return ONLY the JSON, no markdown, no explanation.`;
   }
 
   const json = await resp.json();
-  let text = json.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-  // Strip markdown code fences if present
-  text = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+  let text = (json.candidates?.[0]?.content?.parts?.[0]?.text || '{}').trim();
+
+  // Strip markdown code fences
+  text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  // Extract JSON object if surrounded by extra text
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+    text = text.slice(start, end + 1);
+  }
+
   try {
     return JSON.parse(text);
   } catch {
-    throw new Error('Could not parse AI response: ' + text.substring(0, 100));
+    // Try to repair truncated JSON by closing it
+    try {
+      const repaired = text + (text.endsWith('"') ? '":""}' : '"}');
+      return JSON.parse(repaired);
+    } catch {
+      throw new Error('AI returned incomplete data. Please try again. Preview: ' + text.substring(0, 80));
+    }
   }
 }
