@@ -595,6 +595,10 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
               className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${viewMode === 'monthly' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
               <BarChart2 size={14} /> Monthly Report
             </button>
+            <button onClick={() => setViewMode('inout' as any)}
+              className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${(viewMode as string) === 'inout' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              <Clock size={14} /> IN/OUT Report
+            </button>
           </div>
         </div>
       </div>
@@ -909,6 +913,128 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                     </td>
                   </tr>
                 </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── IN/OUT REPORT VIEW ─────────────────────────────────── */}
+      {(viewMode as string) === 'inout' && (
+        <div className="space-y-4 animate-in fade-in">
+          {/* Month Selector */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <button onClick={() => { const d = new Date(reportYear, reportMonth - 1); setReportMonth(d.getMonth()); setReportYear(d.getFullYear()); }}
+                className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-all"><ChevronLeft size={18} /></button>
+              <div className="text-center min-w-[140px]">
+                <p className="text-lg font-black text-slate-800">{['January','February','March','April','May','June','July','August','September','October','November','December'][reportMonth]} {reportYear}</p>
+                <p className="text-xs text-slate-400">{monthDays.length} days · {employees.length} employees</p>
+              </div>
+              <button onClick={() => { const d = new Date(reportYear, reportMonth + 1); setReportMonth(d.getMonth()); setReportYear(d.getFullYear()); }}
+                className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-all"><ChevronRight size={18} /></button>
+            </div>
+            <button
+              onClick={() => {
+                const header = ['EMP ID','NAME','','...dates...'];
+                const rows: string[][] = [];
+                employees.forEach(emp => {
+                  const inRow = [emp.employeeCode || emp.id, emp.name, 'IN', ...monthDays.map(d => getMonthRecord(emp.id, d)?.checkIn || '')];
+                  const outRow = ['','','OUT', ...monthDays.map(d => getMonthRecord(emp.id, d)?.checkOut || '')];
+                  const otRow = ['','','OT HOURS', ...monthDays.map(d => String(getMonthRecord(emp.id, d)?.overtimeHours || 0))];
+                  rows.push(inRow, outRow, otRow);
+                });
+                const dateHeader = ['EMP ID','NAME','', ...monthDays.map(d => d.slice(8)+'-'+d.slice(5,7))];
+                const csv = [dateHeader, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+                const blob = new Blob([csv], {type:'text/csv'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url;
+                a.download = `InOut_${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][reportMonth]}_${reportYear}.csv`;
+                a.click(); URL.revokeObjectURL(url);
+              }}
+              className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-200">
+              <Download size={14} /> Export CSV
+            </button>
+          </div>
+
+          {/* Pivot Table */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="text-xs border-collapse min-w-full">
+                <thead>
+                  <tr className="bg-slate-800 text-white">
+                    <th className="sticky left-0 z-20 bg-slate-800 px-3 py-3 text-left font-bold text-[11px] uppercase border-r border-slate-700 min-w-[70px]">EMP ID</th>
+                    <th className="sticky left-[70px] z-20 bg-slate-800 px-3 py-3 text-left font-bold text-[11px] uppercase border-r border-slate-700 min-w-[130px]">Name</th>
+                    <th className="px-3 py-3 text-left font-bold text-[11px] uppercase border-r border-slate-700 min-w-[90px]">Date</th>
+                    {monthDays.map(date => {
+                      const d = new Date(date);
+                      const isSun = d.getDay() === 0;
+                      return (
+                        <th key={date} className={`px-1 py-2 text-center font-bold min-w-[52px] border-r border-slate-700 ${isSun ? 'bg-purple-900/50' : ''}`}>
+                          <div className="text-[10px] text-slate-400">{['Su','Mo','Tu','We','Th','Fr','Sa'][d.getDay()]}</div>
+                          <div className={`text-xs font-black ${isSun ? 'text-purple-300' : 'text-white'}`}>{String(d.getDate()).padStart(2,'0')}-{String(reportMonth+1).padStart(2,'0')}</div>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees.map((emp, empIdx) => {
+                    const rowBg = empIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
+                    const cellBorder = 'border-b border-slate-100';
+                    return (
+                      <React.Fragment key={emp.id}>
+                        {/* IN row */}
+                        <tr className={rowBg}>
+                          <td rowSpan={3} className={`sticky left-0 z-10 ${rowBg} px-3 py-2 border-r border-slate-200 border-b-2 border-b-slate-200 font-mono font-bold text-slate-600 text-[11px] align-middle`}>
+                            {emp.employeeCode || emp.id}
+                          </td>
+                          <td rowSpan={3} className={`sticky left-[70px] z-10 ${rowBg} px-3 py-2 border-r border-slate-200 border-b-2 border-b-slate-200 align-middle`}>
+                            <p className="font-bold text-slate-800">{emp.name}</p>
+                            <p className="text-[10px] text-slate-400">{emp.designation}</p>
+                          </td>
+                          <td className={`px-3 py-1.5 border-r border-slate-100 ${cellBorder} font-bold text-indigo-600 bg-indigo-50/40 text-[11px]`}>IN</td>
+                          {monthDays.map(date => {
+                            const r = getMonthRecord(emp.id, date);
+                            const isSun = new Date(date).getDay() === 0;
+                            return (
+                              <td key={date} className={`px-1 py-1.5 text-center border-r border-slate-100 ${cellBorder} ${isSun ? 'bg-purple-50/40' : ''} ${r?.lateMinutes && r.lateMinutes > 0 ? 'bg-rose-50' : ''}`}>
+                                <span className="font-mono text-[10px] font-semibold text-slate-700">{r?.checkIn || '—'}</span>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                        {/* OUT row */}
+                        <tr className={rowBg}>
+                          <td className={`px-3 py-1.5 border-r border-slate-100 ${cellBorder} font-bold text-rose-600 bg-rose-50/40 text-[11px]`}>OUT</td>
+                          {monthDays.map(date => {
+                            const r = getMonthRecord(emp.id, date);
+                            const isSun = new Date(date).getDay() === 0;
+                            return (
+                              <td key={date} className={`px-1 py-1.5 text-center border-r border-slate-100 ${cellBorder} ${isSun ? 'bg-purple-50/40' : ''}`}>
+                                <span className="font-mono text-[10px] font-semibold text-slate-700">{r?.checkOut || '—'}</span>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                        {/* OT HOURS row */}
+                        <tr className={`${rowBg} border-b-2 border-slate-200`}>
+                          <td className={`px-3 py-1.5 border-r border-slate-100 font-bold text-amber-600 bg-amber-50/40 text-[11px]`}>OT HRS</td>
+                          {monthDays.map(date => {
+                            const r = getMonthRecord(emp.id, date);
+                            const isSun = new Date(date).getDay() === 0;
+                            const ot = r?.overtimeHours || 0;
+                            return (
+                              <td key={date} className={`px-1 py-1.5 text-center border-r border-slate-100 ${isSun ? 'bg-purple-50/40' : ''}`}>
+                                <span className={`font-mono text-[10px] font-bold ${ot > 0 ? 'text-amber-600' : 'text-slate-300'}`}>{ot > 0 ? ot : '0'}</span>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
               </table>
             </div>
           </div>
