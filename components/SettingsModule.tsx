@@ -716,7 +716,6 @@ const SettingsModule: React.FC<Props> = ({ payrollConfig, onUpdatePayrollConfig,
                         </div>
                       </div>
                     </div>
-                  </div>
                 </div>
 
                 {/* Factory OT Slab Config */}
