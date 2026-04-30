@@ -13,6 +13,24 @@ interface Props {
   payrollConfig?: PayrollConfig;
 }
 
+// Factory OT slab payable hours (mirrors OvertimeModule logic)
+function calcFactoryOTPayable(actualOTHours: number, slabs: {requiredHours: number; bonusHours: number}[]): number {
+  if (!slabs || slabs.length === 0) return actualOTHours;
+  const slab1 = slabs[0];
+  if (actualOTHours < slab1.requiredHours) return 0;
+  let payable = slab1.requiredHours + slab1.bonusHours;
+  let remaining = actualOTHours - slab1.requiredHours;
+  for (let i = 1; i < slabs.length; i++) {
+    const slab = slabs[i];
+    if (remaining <= 0) break;
+    if (remaining >= slab.requiredHours) { payable += slab.requiredHours + slab.bonusHours; remaining -= slab.requiredHours; }
+    else { payable += remaining; remaining = 0; break; }
+  }
+  if (remaining > 0) payable += remaining;
+  return Math.round(payable * 100) / 100;
+}
+
+
 const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holidays = [], onUpdate, onBulkUpdate, payrollConfig }) => {
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -89,7 +107,24 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
       }
     });
     const daysPaid = present + (halfDays / 2) + holiday;
-    return { present, absent, leave, holiday, late, totalOT, halfDays, daysPaid };
+    // Compute payable OT using factory slab rules
+    const emp2 = employees.find(e => e.id === empId);
+    const shift2 = shifts.find(s => s.id === emp2?.shiftId);
+    const factoryCfg2 = (payrollConfig as any)?.factoryOTConfig;
+    let deptSlabs: {requiredHours: number; bonusHours: number}[] | null = null;
+    if (factoryCfg2?.enabled && factoryCfg2.deptConfigs?.length > 0) {
+      const dCfg = factoryCfg2.deptConfigs.find((d: any) => d.enabled && (d.department === 'All Departments' || d.department === emp2?.department));
+      if (dCfg?.slabs?.length > 0) deptSlabs = dCfg.slabs;
+    }
+    let totalOTPayable = 0;
+    days.forEach(date => {
+      const r2 = getMonthRecord(empId, date);
+      if (!r2 || !r2.overtimeHours || r2.overtimeHours <= 0) return;
+      const floored = Math.floor(r2.overtimeHours * 2) / 2;
+      if (floored <= 0) return;
+      totalOTPayable += deptSlabs ? calcFactoryOTPayable(floored, deptSlabs) : floored;
+    });
+    return { present, absent, leave, holiday, late, totalOT, halfDays, daysPaid, totalOTPayable };
   };
 
   const handleCellSave = () => {
@@ -803,6 +838,8 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                     <th className="px-1 py-3 text-center font-bold bg-red-900/40 border-r border-slate-700 min-w-[32px]">A</th>
                     <th className="px-1 py-3 text-center font-bold bg-amber-900/40 border-r border-slate-700 min-w-[32px]">L</th>
                     <th className="px-1 py-3 text-center font-bold bg-purple-900/40 border-r border-slate-700 min-w-[32px]">H</th>
+                    <th className="px-1 py-3 text-center font-bold bg-orange-900/40 border-r border-slate-700 min-w-[48px] text-[9px]">OT<br/>Actual</th>
+                    <th className="px-1 py-3 text-center font-bold bg-rose-900/40 border-r border-slate-700 min-w-[52px] text-[9px]">OT<br/>Payable</th>
                     <th className="px-1 py-3 text-center font-bold bg-sky-900/40 border-r border-slate-700 min-w-[32px]">HD</th>
                     <th className="px-1 py-3 text-center font-bold bg-indigo-900/40 min-w-[52px] text-[10px]">DAYS<br/>PAID</th>
                   </tr>
@@ -903,6 +940,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                         <td className="px-2 py-2 text-center font-black text-amber-600 bg-amber-50/50 border-r border-slate-100">{summary.leave}</td>
                         <td className="px-2 py-2 text-center font-black text-purple-600 bg-purple-50/50 border-r border-slate-100">{summary.holiday}</td>
                         <td className="px-2 py-2 text-center font-black text-orange-600 bg-orange-50/50 border-r border-slate-100">{summary.totalOT > 0 ? summary.totalOT.toFixed(1) : '—'}</td>
+                        <td className="px-2 py-2 text-center font-black text-rose-700 bg-rose-50/50 border-r border-slate-100">{summary.totalOTPayable > 0 ? summary.totalOTPayable.toFixed(1) : '—'}</td>
                         <td className="px-2 py-2 text-center font-black text-sky-600 bg-sky-50/50 border-r border-slate-100">{summary.halfDays > 0 ? summary.halfDays : '—'}</td>
                         <td className="px-2 py-2 text-center font-black text-indigo-700 bg-indigo-50/50 font-extrabold">{summary.daysPaid > 0 ? summary.daysPaid.toFixed(1).replace('.0','') : '0'}</td>
                       </tr>
@@ -940,6 +978,9 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                     </td>
                     <td className="px-2 py-2 text-center text-orange-300 font-black bg-orange-900/20 border-r border-slate-700">
                       {employees.reduce((s, emp) => s + getEmpMonthlySummary(emp.id, monthDays).totalOT, 0).toFixed(1)}
+                    </td>
+                    <td className="px-2 py-2 text-center text-rose-300 font-black bg-rose-900/20 border-r border-slate-700">
+                      {employees.reduce((s, emp) => s + getEmpMonthlySummary(emp.id, monthDays).totalOTPayable, 0).toFixed(1)}
                     </td>
                     <td className="px-2 py-2 text-center text-sky-300 font-black bg-sky-900/20 border-r border-slate-700">
                       {employees.reduce((s, emp) => s + getEmpMonthlySummary(emp.id, monthDays).halfDays, 0)}
