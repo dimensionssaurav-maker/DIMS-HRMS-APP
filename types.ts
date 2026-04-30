@@ -20,6 +20,18 @@ export interface DeductionRule {
   enabled: boolean;
 }
 
+export interface FactoryOTSlab {
+  id: string;
+  requiredHours: number;  // hours employee must actually complete for this slab
+  bonusHours: number;     // extra hours paid on top when slab is completed
+}
+
+export interface FactoryOTDeptConfig {
+  department: string;     // 'All Departments' or specific dept name
+  enabled: boolean;
+  slabs: FactoryOTSlab[]; // up to 3 slabs
+}
+
 export interface OTRule {
   id: string;
   department: string; // 'All Departments' or specific
@@ -45,6 +57,10 @@ export interface PayrollConfig {
   otConfig?: {
     enabled: boolean;
     rules: OTRule[];
+  };
+  factoryOTConfig?: {
+    enabled: boolean;
+    deptConfigs: FactoryOTDeptConfig[];
   };
   recruitmentConfig?: {
     sources: string[];

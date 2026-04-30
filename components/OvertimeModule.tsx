@@ -46,6 +46,40 @@ function distributeOTAcrossSlabs(overtimeHours: number, shiftEnd: string, slabs:
   return results;
 }
 function totalOTPayFromSlabs(slabResults: OTSlabResult[]): number { return slabResults.reduce((sum, s) => sum + s.amount, 0); }
+
+// ── Factory OT slab calculation ──────────────────────────────────────────────
+// Slab 1: if actual < required → 0 OT (minimum not met)
+// Slab 1 completed: pay required + bonus hours
+// Slab 2/3 completed: pay required + bonus hours each
+// Slab 2/3 partially done: pay actual hours only (no bonus, no deduction)
+function calculateFactoryOTHours(actualOTHours: number, slabs: {requiredHours: number; bonusHours: number}[]): number {
+  if (!slabs || slabs.length === 0) return actualOTHours;
+  const slab1 = slabs[0];
+  // Minimum threshold: must complete slab 1 to get any OT
+  if (actualOTHours < slab1.requiredHours) return 0;
+
+  let payableHours = slab1.requiredHours + slab1.bonusHours;
+  let remaining = actualOTHours - slab1.requiredHours;
+
+  for (let i = 1; i < slabs.length; i++) {
+    const slab = slabs[i];
+    if (remaining <= 0) break;
+    if (remaining >= slab.requiredHours) {
+      // Completed this slab — pay required + bonus
+      payableHours += slab.requiredHours + slab.bonusHours;
+      remaining -= slab.requiredHours;
+    } else {
+      // Partial — pay actual hours only, no bonus
+      payableHours += remaining;
+      remaining = 0;
+      break;
+    }
+  }
+  // Any hours beyond all configured slabs — pay actual (no bonus)
+  if (remaining > 0) payableHours += remaining;
+
+  return Math.round(payableHours * 100) / 100;
+}
 const SLAB_COLOURS: Record<string, { bg: string; text: string }> = {
   'Normal OT': { bg: 'bg-emerald-100', text: 'text-emerald-800' },
   'Half Night OT': { bg: 'bg-amber-100', text: 'text-amber-800' },
@@ -76,18 +110,31 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
       const shift = getShift(emp); const hourlyRate = emp.dailyWage / (shift?.workingHours ?? 8);
       const multiplier = payrollConfig.designationOverrides[emp.designation] ?? payrollConfig.globalOtMultiplier;
       let slabBreakdown: OTSlabResult[] = []; let otAmount = 0; let isTieredApplied = false; let payableHours = r.overtimeHours;
+      // ── Factory OT slabs (highest priority) ──
+      const factoryCfg = payrollConfig.factoryOTConfig;
+      if (factoryCfg?.enabled && factoryCfg.deptConfigs?.length > 0) {
+        const deptCfg = factoryCfg.deptConfigs.find(d =>
+          d.enabled && (d.department === 'All Departments' || d.department === emp.department)
+        );
+        if (deptCfg && deptCfg.slabs.length > 0) {
+          payableHours = calculateFactoryOTHours(r.overtimeHours, deptCfg.slabs);
+          otAmount = emp.isOtAllowed ? Math.round(payableHours * hourlyRate * multiplier) : 0;
+          isTieredApplied = true;
+        }
+      }
+
       const otSlabs = (shift as any)?.otSlabs as OTSlab[] | undefined;
-      if (otSlabs && otSlabs.length > 0) {
+      if (!isTieredApplied && otSlabs && otSlabs.length > 0) {
         slabBreakdown = distributeOTAcrossSlabs(r.overtimeHours, shift!.endTime, otSlabs, hourlyRate);
         otAmount = emp.isOtAllowed ? totalOTPayFromSlabs(slabBreakdown) : 0;
         payableHours = Math.round(slabBreakdown.reduce((s, b) => s + b.hours, 0) * 100) / 100; isTieredApplied = true;
-      } else if (payrollConfig.otConfig?.enabled && payrollConfig.otConfig.rules?.length > 0) {
+      } else if (!isTieredApplied && payrollConfig.otConfig?.enabled && payrollConfig.otConfig.rules?.length > 0) {
         const otMins = r.overtimeHours * 60;
         const rules = payrollConfig.otConfig.rules.filter(rule => rule.enabled && (rule.department === 'All Departments' || rule.department === emp.department)).sort((a, b) => b.thresholdMinutes - a.thresholdMinutes);
         const matched = rules.find(rule => otMins >= rule.thresholdMinutes);
         if (matched) { payableHours = matched.payoutAmount; isTieredApplied = true; }
         otAmount = emp.isOtAllowed ? Math.round(payableHours * hourlyRate * multiplier) : 0;
-      } else { otAmount = emp.isOtAllowed ? Math.round(r.overtimeHours * hourlyRate * multiplier) : 0; }
+      } else if (!isTieredApplied) { otAmount = emp.isOtAllowed ? Math.round(r.overtimeHours * hourlyRate * multiplier) : 0; }
       let foodingAmount = 0;
       if (emp.isOtAllowed && payrollConfig.foodingConfig.enabled) {
         const dr = payrollConfig.foodingConfig.departmentOverrides?.[emp.department];

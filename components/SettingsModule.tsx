@@ -853,6 +853,123 @@ const SettingsModule: React.FC<Props> = ({ payrollConfig, onUpdatePayrollConfig,
                   </div>
                 </div>
 
+                {/* Factory OT Slab Config */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-slate-700 flex items-center gap-2">
+                      <Clock size={18} className="text-amber-600" /> Factory OT Slab Rules
+                    </h4>
+                    <button
+                      onClick={() => setLocalPayrollConfig(prev => ({
+                        ...prev,
+                        factoryOTConfig: {
+                          enabled: !(prev.factoryOTConfig?.enabled ?? false),
+                          deptConfigs: prev.factoryOTConfig?.deptConfigs ?? []
+                        }
+                      }))}
+                      className={`p-1 rounded-full transition-all ${localPayrollConfig.factoryOTConfig?.enabled ? 'text-amber-600' : 'text-slate-300'}`}
+                    >
+                      {localPayrollConfig.factoryOTConfig?.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                    </button>
+                  </div>
+
+                  {localPayrollConfig.factoryOTConfig?.enabled && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 space-y-5">
+                      <p className="text-xs text-amber-700 font-semibold">
+                        Configure up to 3 slabs per department. Slab 1 is the minimum — employee must complete it to receive any OT. Subsequent slabs: if not completed, actual hours are paid with no deduction and no bonus.
+                      </p>
+
+                      {/* Add / edit dept config */}
+                      {(() => {
+                        const deptConfigs = localPayrollConfig.factoryOTConfig?.deptConfigs ?? [];
+                        const allDepts = ['All Departments', ...departments.filter(d => d !== 'All Departments')];
+                        return (
+                          <div className="space-y-4">
+                            {allDepts.map(dept => {
+                              const existing = deptConfigs.find(d => d.department === dept);
+                              const cfg = existing ?? { department: dept, enabled: false, slabs: [
+                                { id: '1', requiredHours: 3.5, bonusHours: 0.5 },
+                                { id: '2', requiredHours: 3, bonusHours: 1 },
+                                { id: '3', requiredHours: 2, bonusHours: 0.5 },
+                              ]};
+                              const isActive = existing?.enabled ?? false;
+
+                              const updateCfg = (updated: typeof cfg) => {
+                                const others = deptConfigs.filter(d => d.department !== dept);
+                                setLocalPayrollConfig(prev => ({
+                                  ...prev,
+                                  factoryOTConfig: {
+                                    enabled: prev.factoryOTConfig?.enabled ?? true,
+                                    deptConfigs: [...others, updated]
+                                  }
+                                }));
+                              };
+
+                              return (
+                                <div key={dept} className={`rounded-xl border p-4 transition-all ${isActive ? 'bg-white border-amber-300 shadow-sm' : 'bg-amber-50/50 border-amber-100'}`}>
+                                  <div className="flex items-center justify-between mb-3">
+                                    <p className="font-black text-sm text-slate-700">{dept}</p>
+                                    <button
+                                      onClick={() => updateCfg({ ...cfg, enabled: !isActive })}
+                                      className={`text-xs font-bold px-3 py-1 rounded-full border transition-all ${isActive ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-white text-slate-400 border-slate-200'}`}
+                                    >
+                                      {isActive ? 'Active' : 'Off'}
+                                    </button>
+                                  </div>
+                                  {isActive && (
+                                    <div className="space-y-2">
+                                      {[0,1,2].map(i => {
+                                        const slab = cfg.slabs[i] ?? { id: String(i+1), requiredHours: 0, bonusHours: 0 };
+                                        return (
+                                          <div key={i} className="flex items-center gap-3 flex-wrap">
+                                            <span className={`text-[10px] font-black w-12 shrink-0 ${i === 0 ? 'text-red-600' : 'text-amber-600'}`}>
+                                              {i === 0 ? 'SLAB 1*' : `SLAB ${i+1}`}
+                                            </span>
+                                            <div className="flex items-center gap-1">
+                                              <span className="text-[10px] text-slate-400 font-bold">Work</span>
+                                              <input type="number" min="0" step="0.5"
+                                                value={slab.requiredHours}
+                                                onChange={e => {
+                                                  const newSlabs = [...cfg.slabs];
+                                                  newSlabs[i] = { ...slab, requiredHours: parseFloat(e.target.value) || 0 };
+                                                  updateCfg({ ...cfg, slabs: newSlabs });
+                                                }}
+                                                className="w-16 px-2 py-1 rounded-lg border border-slate-200 text-xs font-bold text-center outline-none focus:ring-2 focus:ring-amber-400"
+                                              />
+                                              <span className="text-[10px] text-slate-400 font-bold">hrs →</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                              <span className="text-[10px] text-slate-400 font-bold">Pay extra</span>
+                                              <input type="number" min="0" step="0.5"
+                                                value={slab.bonusHours}
+                                                onChange={e => {
+                                                  const newSlabs = [...cfg.slabs];
+                                                  newSlabs[i] = { ...slab, bonusHours: parseFloat(e.target.value) || 0 };
+                                                  updateCfg({ ...cfg, slabs: newSlabs });
+                                                }}
+                                                className="w-16 px-2 py-1 rounded-lg border border-slate-200 text-xs font-bold text-center outline-none focus:ring-2 focus:ring-amber-400"
+                                              />
+                                              <span className="text-[10px] text-slate-400 font-bold">hrs bonus</span>
+                                            </div>
+                                            <span className="text-[10px] text-emerald-600 font-bold">
+                                              = {(slab.requiredHours + slab.bonusHours).toFixed(1)}h paid
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                      <p className="text-[10px] text-red-500 font-semibold mt-1">* Slab 1 = minimum threshold. Not completed = 0 OT.</p>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+
                 {/* Recruitment Config */}
                 <div className="space-y-4">
                   <h4 className="font-bold text-slate-700 flex items-center gap-2">
