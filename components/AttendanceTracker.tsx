@@ -282,6 +282,15 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
       return Math.round((otMinutes / 60) * 100) / 100;
   };
 
+  // Returns effective OT — stored value if > 0, else recalculated from punch times vs shift end
+  const getEffectiveOT = (record: any, employee: Employee, date: string): number => {
+    if ((record?.overtimeHours ?? 0) > 0) return record.overtimeHours;
+    const checkIn = record?.checkIn || record?.punchIn || '';
+    const checkOut = record?.checkOut || record?.punchOut || '';
+    if (!checkIn || !checkOut || !employee.isOtAllowed) return 0;
+    return calculateOT(checkIn, checkOut, employee, date);
+  };
+
   const handleStatusChange = (empId: string, status: AttendanceStatus) => {
     const existing = getRecord(empId);
     onUpdate({
@@ -691,7 +700,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                       {emp.isOtAllowed ? (
                         <div className="flex items-center justify-center gap-1">
                           <input type="number" min="0" max="12" step="0.5"
-                            value={record?.overtimeHours || 0}
+                            value={getEffectiveOT(record, emp, currentDate)}
                             onChange={(e) => handleOvertimeChange(emp.id, e.target.value)}
                             className="w-14 border border-indigo-200 bg-indigo-50 rounded-lg p-1 text-center text-xs font-bold text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-300"
                           />
@@ -968,7 +977,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                 employees.forEach(emp => {
                   const inRow = [emp.employeeCode || emp.id, emp.name, 'IN', ...monthDays.map(d => getMonthRecord(emp.id, d)?.checkIn || '')];
                   const outRow = ['','','OUT', ...monthDays.map(d => getMonthRecord(emp.id, d)?.checkOut || '')];
-                  const otRow = ['','','OT HOURS', ...monthDays.map(d => String(getMonthRecord(emp.id, d)?.overtimeHours || 0))];
+                  const otRow = ['','','OT HOURS', ...monthDays.map(d => { const rec = getMonthRecord(emp.id, d); return String(rec ? getEffectiveOT(rec, emp, d) : 0); })];
                   rows.push(inRow, outRow, otRow);
                 });
                 const dateHeader = ['EMP ID','NAME','', ...monthDays.map(d => d.slice(8)+'-'+d.slice(5,7))];
@@ -1058,7 +1067,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                           {monthDays.map(date => {
                             const r = getMonthRecord(emp.id, date);
                             const isSun = new Date(date).getDay() === 0;
-                            const ot = r?.overtimeHours || 0;
+                            const ot = getEffectiveOT(r, emp, date);
                             return (
                               <td key={date} className={`px-1 py-1.5 text-center border-r border-slate-100 ${isSun ? 'bg-purple-50/40' : ''}`}>
                                 <span className={`font-mono text-[10px] font-bold ${ot > 0 ? 'text-amber-600' : 'text-slate-300'}`}>{ot > 0 ? ot : '0'}</span>

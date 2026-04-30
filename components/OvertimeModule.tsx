@@ -72,7 +72,38 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return [];
     const deduped = new Map<string, typeof attendanceRecords[0]>();
     for (const r of attendanceRecords) deduped.set(r.employeeId + '-' + r.date, r);
-    const recordsInPeriod = Array.from(deduped.values()).filter(r => { const d = new Date(r.date); return d >= start && d <= end && r.overtimeHours > 0; });
+    // Recalculate OT from punch times if stored value is 0/missing
+    const toMinsOT = (t: string) => { if (!t) return 0; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const recalcOT = (r: any, emp: any, shift: any): number => {
+      if ((r.overtimeHours ?? 0) > 0) return r.overtimeHours; // already set
+      if (!emp?.isOtAllowed) return 0;
+      const checkIn = r.checkIn || r.punchIn || '';
+      const checkOut = r.checkOut || r.punchOut || '';
+      if (!checkIn || !checkOut || !shift) return 0;
+      const dayOfWeek = new Date(r.date).getDay();
+      const isSunday = dayOfWeek === 0;
+      const sundayCfg = shift.sundaySchedule;
+      if (isSunday && sundayCfg?.enabled && sundayCfg.isFullDayOvertime) {
+        let totalMins = toMinsOT(checkOut) - toMinsOT(checkIn);
+        if (totalMins < 0) totalMins += 1440;
+        const totalHrs = totalMins / 60;
+        return totalHrs >= 7 ? Math.max(8, Math.round(totalHrs * 100) / 100) : Math.round(totalHrs * 100) / 100;
+      }
+      const shiftEndStr = (isSunday && sundayCfg?.enabled) ? sundayCfg.endTime : shift.endTime;
+      let coMins = toMinsOT(checkOut);
+      const seMins = toMinsOT(shiftEndStr);
+      if (coMins < seMins - 600) coMins += 1440;
+      const otMins = coMins - seMins;
+      return otMins > 0 ? Math.round((otMins / 60) * 100) / 100 : 0;
+    };
+    const recordsInPeriod = Array.from(deduped.values())
+      .map(r => {
+        const emp = employees.find(e => e.id === r.employeeId);
+        const shift = emp?.shiftId ? shifts?.find((s: any) => s.id === emp.shiftId) : undefined;
+        const ot = recalcOT(r, emp, shift);
+        return ot > 0 ? { ...r, overtimeHours: ot } : r;
+      })
+      .filter(r => { const d = new Date(r.date); return d >= start && d <= end && r.overtimeHours > 0; });
     const joined = recordsInPeriod.map(r => {
       const emp = employees.find(e => e.id === r.employeeId); if (!emp) return null;
       const shift = getShift(emp); const hourlyRate = emp.dailyWage / (shift?.workingHours ?? 8);
