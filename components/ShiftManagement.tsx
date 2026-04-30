@@ -18,6 +18,32 @@ import {
 import { Shift, OTSlab } from '../types';
 
 
+
+const toMins = (t: string): number => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+const calcWorkHours = (start: string, end: string, breakMins: number): number => {
+  let s = toMins(start), e = toMins(end);
+  if (e <= s) e += 1440; // night shift
+  return Math.round(((e - s - breakMins) / 60) * 100) / 100;
+};
+const slabsOverlap = (a: OTSlab, b: OTSlab): boolean => {
+  const range = (sl: OTSlab): [number, number] => {
+    let s = toMins(sl.startTime), e = toMins(sl.endTime);
+    if (sl.crossesMidnight || e <= s) e += 1440;
+    return [s, e];
+  };
+  const [as2, ae] = range(a);
+  const [bs, be] = range(b);
+  return as2 < be && bs < ae;
+};
+const getSlabConflicts = (slabs: OTSlab[]): Set<string> => {
+  const enabled = slabs.filter(s => s.enabled);
+  const ids = new Set<string>();
+  for (let i = 0; i < enabled.length; i++)
+    for (let j = i + 1; j < enabled.length; j++)
+      if (slabsOverlap(enabled[i], enabled[j])) { ids.add(enabled[i].id); ids.add(enabled[j].id); }
+  return ids;
+};
+
 const DEFAULT_OT_SLABS: OTSlab[] = [
   { id: 'slab1', name: 'Normal OT', startTime: '17:30', endTime: '21:00', multiplier: 1.5, crossesMidnight: false, enabled: true },
   { id: 'slab2', name: 'Half Night OT', startTime: '21:00', endTime: '00:00', multiplier: 2.0, crossesMidnight: true, enabled: true },
@@ -27,8 +53,15 @@ const DEFAULT_OT_SLABS: OTSlab[] = [
 interface OTSlabEditorProps { slabs: OTSlab[]; onChange: (slabs: OTSlab[]) => void; }
 
 const OTSlabEditor: React.FC<OTSlabEditorProps> = ({ slabs, onChange }) => {
+  const conflicts = getSlabConflicts(slabs);
   const update = (idx: number, field: keyof OTSlab, val: any) => {
-    const next = slabs.map((s, i) => i === idx ? { ...s, [field]: val } : s);
+    let next = slabs.map((s, i) => i === idx ? { ...s, [field]: val } : s);
+    // Auto-set crossesMidnight when endTime < startTime
+    if (field === 'startTime' || field === 'endTime') {
+      const sl = next[idx];
+      const autoCross = toMins(sl.endTime) <= toMins(sl.startTime);
+      next = next.map((s, i) => i === idx ? { ...s, crossesMidnight: autoCross } : s);
+    }
     onChange(next);
   };
   const addSlab = () => {
@@ -49,8 +82,13 @@ const OTSlabEditor: React.FC<OTSlabEditorProps> = ({ slabs, onChange }) => {
         </button>
       </div>
       <div className="space-y-2">
+        {slabs.some(s => s.enabled && conflicts.has(s.id)) && (
+          <div className="flex items-center gap-2 mb-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs font-bold text-red-700">
+            ⚠️ Overlapping time slabs detected — fix before saving to avoid double-counting OT.
+          </div>
+        )}
         {slabs.map((slab, idx) => (
-          <div key={slab.id} className={"rounded-lg p-3 border " + (slab.enabled ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100 opacity-60')}>
+          <div key={slab.id} className={"rounded-lg p-3 border " + (conflicts.has(slab.id) ? 'bg-red-50 border-red-300' : slab.enabled ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100 opacity-60')}>
             <div className="flex items-center gap-2 mb-2">
               <input type="checkbox" checked={slab.enabled} onChange={e => update(idx, 'enabled', e.target.checked)} className="rounded" />
               <input type="text" value={slab.name} onChange={e => update(idx, 'name', e.target.value)} className="flex-1 text-sm font-bold text-slate-700 border border-slate-200 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" placeholder="Slab Name"/>
@@ -171,13 +209,20 @@ const ShiftManagement: React.FC<Props> = ({ shifts, onAdd, onUpdate, onDelete })
             startTime: '09:00',
             endTime: '16:00',
             isFullDayOvertime: true
-        }
+        },
+        otSlabs: DEFAULT_OT_SLABS
     });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.site) return;
+    // Block save if OT slabs overlap
+    const activeSlabs = (formData.otSlabs as OTSlab[]) || [];
+    if (getSlabConflicts(activeSlabs).size > 0) {
+      alert('⚠️ Cannot save: OT time slabs are overlapping. Please fix the slab times before saving.');
+      return;
+    }
 
     if (editingId) {
       onUpdate({ ...formData, id: editingId } as Shift);
@@ -375,7 +420,11 @@ const ShiftManagement: React.FC<Props> = ({ shifts, onAdd, onUpdate, onDelete })
                          type="time" 
                          required
                          value={formData.startTime}
-                         onChange={e => setFormData({...formData, startTime: e.target.value})}
+                         onChange={e => {
+                           const st = e.target.value;
+                           const wh = calcWorkHours(st, formData.endTime!, formData.breakDurationMinutes!);
+                           setFormData({...formData, startTime: st, workingHours: wh > 0 ? wh : formData.workingHours, overtimeThresholdHours: wh > 0 ? wh : formData.overtimeThresholdHours});
+                         }}
                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-mono"
                        />
                     </div>
@@ -387,7 +436,12 @@ const ShiftManagement: React.FC<Props> = ({ shifts, onAdd, onUpdate, onDelete })
                          type="time" 
                          required
                          value={formData.endTime}
-                         onChange={e => setFormData({...formData, endTime: e.target.value})}
+                         onChange={e => {
+                           const et = e.target.value;
+                           const wh = calcWorkHours(formData.startTime!, et, formData.breakDurationMinutes!);
+                           const isNight = toMins(et) < toMins(formData.startTime!);
+                           setFormData({...formData, endTime: et, workingHours: wh > 0 ? wh : formData.workingHours, overtimeThresholdHours: wh > 0 ? wh : formData.overtimeThresholdHours, isNightShift: isNight});
+                         }}
                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-mono"
                        />
                     </div>
@@ -418,7 +472,11 @@ const ShiftManagement: React.FC<Props> = ({ shifts, onAdd, onUpdate, onDelete })
                        <input 
                          type="number"
                          value={formData.breakDurationMinutes}
-                         onChange={e => setFormData({...formData, breakDurationMinutes: Number(e.target.value)})}
+                         onChange={e => {
+                           const brk = Number(e.target.value);
+                           const wh = calcWorkHours(formData.startTime!, formData.endTime!, brk);
+                           setFormData({...formData, breakDurationMinutes: brk, workingHours: wh > 0 ? wh : formData.workingHours, overtimeThresholdHours: wh > 0 ? wh : formData.overtimeThresholdHours});
+                         }}
                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none font-bold text-center"
                        />
                     </div>
@@ -429,8 +487,11 @@ const ShiftManagement: React.FC<Props> = ({ shifts, onAdd, onUpdate, onDelete })
                          step="0.5"
                          value={formData.overtimeThresholdHours}
                          onChange={e => setFormData({...formData, overtimeThresholdHours: Number(e.target.value)})}
-                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none font-bold text-center"
+                         className={"w-full border rounded-xl px-3 py-2.5 outline-none font-bold text-center " + ((formData.overtimeThresholdHours ?? 8) < (formData.workingHours ?? 8) ? 'bg-red-50 border-red-300 text-red-700' : 'bg-slate-50 border-slate-200')}
                        />
+                       {(formData.overtimeThresholdHours ?? 8) < (formData.workingHours ?? 8) && (
+                         <p className="text-[9px] text-red-500 font-bold">⚠️ Less than work hours — OT starts mid-shift!</p>
+                       )}
                     </div>
                  </div>
 

@@ -108,7 +108,7 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
     const joined = recordsInPeriod.map(r => {
       const emp = employees.find(e => e.id === r.employeeId); if (!emp) return null;
       const shift = getShift(emp); const hourlyRate = emp.dailyWage / (shift?.workingHours ?? 8);
-      const multiplier = payrollConfig.designationOverrides[emp.designation] ?? payrollConfig.globalOtMultiplier;
+      const multiplier = (payrollConfig.designationOverrides ?? {})[emp.designation] ?? payrollConfig.globalOtMultiplier;
       let slabBreakdown: OTSlabResult[] = []; let otAmount = 0; let isTieredApplied = false; let payableHours = r.overtimeHours;
       // ── Factory OT slabs (highest priority) ──
       const factoryCfg = payrollConfig.factoryOTConfig;
@@ -182,7 +182,7 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
   const maxDailyHours = useMemo(() => filteredData.reduce((m, d) => d.overtimeHours > m ? d.overtimeHours : m, 1), [filteredData]);
   const chartData = useMemo(() => {
     const m = new Map(); filteredData.forEach(d => m.set(d.department, (m.get(d.department) || 0) + d.overtimeHours));
-    return Object.keys(m).map(name => ({ name, value: m[name] }));
+    return Array.from(m.entries()).map(([name, value]) => ({ name, value }));
   }, [filteredData]);
 
   const handleExport = (type: 'csv' | 'monthly') => {
