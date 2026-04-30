@@ -8,6 +8,10 @@ import {
   ChevronDown, ChevronUp
 } from 'lucide-react';
 import { Employee, AttendanceRecord, PayrollConfig, Shift } from '../types';
+interface OTSlabResult {
+  slabName: string; minutes: number; hours: number; multiplier: number; amount: number;
+}
+
 
 function toMins(t: string): number { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
 
