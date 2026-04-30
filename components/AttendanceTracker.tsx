@@ -236,70 +236,50 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
   const calculateOT = (checkIn: string, checkOut: string, employee: Employee, date: string): number => {
       if (!checkIn || !checkOut || !employee.isOtAllowed) return 0;
 
-      const { isSundaySchedule, sundayConfig } = getShiftConfigForDate(employee, date);
-      
+      const { shiftEnd, isSundaySchedule, sundayConfig } = getShiftConfigForDate(employee, date);
+
+      const toM = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+
       const [inH, inM] = checkIn.split(':').map(Number);
       const [outH, outM] = checkOut.split(':').map(Number);
-      
-      let diffMinutes = (outH * 60 + outM) - (inH * 60 + inM);
-      if (diffMinutes < 0) diffMinutes += 24 * 60; // Handle overnight
-      
-      const totalHours = diffMinutes / 60;
+      let totalMinutes = (outH * 60 + outM) - (inH * 60 + inM);
+      if (totalMinutes < 0) totalMinutes += 1440;
+      const totalHours = totalMinutes / 60;
 
-      // --- Special Sunday Logic ---
+      // --- Sunday full-day OT logic (unchanged) ---
       if (isSundaySchedule && sundayConfig?.isFullDayOvertime) {
-          // Rule: If worked >= 7 hours, pay for 8 hours (or actuals if greater).
-          // If worked < 7 hours, pay actuals.
-          if (totalHours >= 7) {
-              return Math.max(8, Math.round(totalHours * 100) / 100);
-          }
+          if (totalHours >= 7) return Math.max(8, Math.round(totalHours * 100) / 100);
           return Math.round(totalHours * 100) / 100;
       }
 
-      // --- Standard Logic ---
-      let threshold = 9; 
-      if (employee.shiftId) {
-          const s = shifts.find(sh => sh.id === employee.shiftId);
-          if (s && s.overtimeThresholdHours > 0) {
-              threshold = s.overtimeThresholdHours;
-          }
-      }
+      // --- OT = time worked AFTER shift end time ---
+      let checkOutMins = toM(checkOut);
+      let shiftEndMins = toM(shiftEnd);
+      // Handle midnight crossing: if checkout appears before shiftEnd by >10h, it's next day
+      if (checkOutMins < shiftEndMins - 600) checkOutMins += 1440;
+      // No OT if left before or exactly at shift end
+      const otMinutes = checkOutMins - shiftEndMins;
+      if (otMinutes <= 0) return 0;
 
-      // 1. Check if OT Rules are enabled (Tiered System)
+      // Tiered OT rules (if enabled in settings)
       if (payrollConfig?.otConfig?.enabled) {
-          // Calculate RAW Overtime Minutes first
-          const rawOTMinutes = (totalHours - threshold) * 60;
-          
-          if (rawOTMinutes <= 0) return 0;
-
-          const applicableRules = payrollConfig.otConfig.rules.filter(r => 
-              r.enabled && (r.department === 'All Departments' || r.department === employee.department)
-          );
-
-          const sortedRules = applicableRules.sort((a, b) => {
-              const aIsSpecific = a.department !== 'All Departments';
-              const bIsSpecific = b.department !== 'All Departments';
-              
-              if (aIsSpecific && !bIsSpecific) return -1;
-              if (!aIsSpecific && bIsSpecific) return 1;
-              
-              return b.thresholdMinutes - a.thresholdMinutes;
-          });
-          
-          for (const rule of sortedRules) {
-              if (rawOTMinutes > rule.thresholdMinutes) {
-                  return rule.payoutAmount;
-              }
+          const applicableRules = payrollConfig.otConfig.rules
+              .filter(r => r.enabled && (r.department === 'All Departments' || r.department === employee.department))
+              .sort((a, b) => {
+                  const aSpec = a.department !== 'All Departments';
+                  const bSpec = b.department !== 'All Departments';
+                  if (aSpec && !bSpec) return -1;
+                  if (!aSpec && bSpec) return 1;
+                  return b.thresholdMinutes - a.thresholdMinutes;
+              });
+          for (const rule of applicableRules) {
+              if (otMinutes > rule.thresholdMinutes) return rule.payoutAmount;
           }
           return 0;
       }
 
-      // 2. Fallback to Standard Calculation
-      if (totalHours > threshold) {
-          const rawOT = totalHours - threshold;
-          return Math.round(rawOT * 100) / 100;
-      }
-      return 0;
+      // Standard: return actual OT hours after shift end
+      return Math.round((otMinutes / 60) * 100) / 100;
   };
 
   const handleStatusChange = (empId: string, status: AttendanceStatus) => {
