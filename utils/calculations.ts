@@ -61,6 +61,30 @@ function recalcOTFromPunch(record: any, employee: any, shifts: Shift[]): number 
 }
 
 // -- Status normalizer helpers (module-level to avoid TDZ in minified build) --
+
+// Mirror of OvertimeModule's factory OT slab calculation
+function calculateFactoryOTHours(actualOTHours: number, slabs: {requiredHours: number; bonusHours: number}[]): number {
+  if (!slabs || slabs.length === 0) return actualOTHours;
+  const slab1 = slabs[0];
+  if (actualOTHours < slab1.requiredHours) return 0;
+  let payableHours = slab1.requiredHours + slab1.bonusHours;
+  let remaining = actualOTHours - slab1.requiredHours;
+  for (let i = 1; i < slabs.length; i++) {
+    const slab = slabs[i];
+    if (remaining <= 0) break;
+    if (remaining >= slab.requiredHours) {
+      payableHours += slab.requiredHours + slab.bonusHours;
+      remaining -= slab.requiredHours;
+    } else {
+      payableHours += remaining;
+      remaining = 0;
+      break;
+    }
+  }
+  if (remaining > 0) payableHours += remaining;
+  return Math.round(payableHours * 100) / 100;
+}
+
 function isPresentStatus(s: string): boolean {
   const v = String(s || '').toUpperCase();
   return v === 'PRESENT' || v === 'P' || v.startsWith('P/');
@@ -191,9 +215,22 @@ export function calculateMonthlyPayroll(
       if (flooredOT <= 0) return;                   // skip if no OT
 
       let dailyPayableHours = flooredOT;
+      let slabApplied = false;
 
-      // Apply OT config rules if defined (threshold -> payout remapping)
-      if (config.otConfig?.enabled && config.otConfig.rules && config.otConfig.rules.length > 0) {
+      // Factory OT slabs (highest priority — mirrors OvertimeModule logic)
+      const factoryCfg = (config as any).factoryOTConfig;
+      if (!slabApplied && factoryCfg?.enabled && factoryCfg.deptConfigs?.length > 0) {
+        const deptCfg = factoryCfg.deptConfigs.find((d: any) =>
+          d.enabled && (d.department === 'All Departments' || d.department === employee.department)
+        );
+        if (deptCfg && deptCfg.slabs?.length > 0) {
+          dailyPayableHours = calculateFactoryOTHours(flooredOT, deptCfg.slabs);
+          slabApplied = true;
+        }
+      }
+
+      // Basic OT config rules fallback (threshold -> payout remapping)
+      if (!slabApplied && config.otConfig?.enabled && config.otConfig.rules && config.otConfig.rules.length > 0) {
         const otMinutes = flooredOT * 60;
         const applicableRules = config.otConfig.rules.filter((r: any) =>
           r.enabled && (r.department === 'All Departments' || r.department === employee.department)
