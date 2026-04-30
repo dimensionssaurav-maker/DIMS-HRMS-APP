@@ -679,14 +679,72 @@ const SettingsModule: React.FC<Props> = ({ payrollConfig, onUpdatePayrollConfig,
                       <Clock size={18} className="text-indigo-600" /> Overtime Multiplier
                     </h4>
                     <div className="space-y-4">
+                      {/* Pay Ratio — actual hours → pay hours */}
                       <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase">Default Multiplier</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">OT Pay Ratio</label>
+                        <p className="text-[11px] text-slate-400 mb-3">Set how many hours are paid for each actual OT hour worked.</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className="text-center">
+                            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Actual Hours</p>
+                            <input
+                              type="number" min="0.5" step="0.5"
+                              value={localPayrollConfig.otPayRatio?.actualHours ?? 1}
+                              onChange={(e) => {
+                                const actual = parseFloat(e.target.value) || 1;
+                                const pay = localPayrollConfig.otPayRatio?.payHours ?? 1.5;
+                                setLocalPayrollConfig({
+                                  ...localPayrollConfig,
+                                  otPayRatio: { actualHours: actual, payHours: pay },
+                                  globalOtMultiplier: Math.round((pay / actual) * 100) / 100
+                                });
+                              }}
+                              className="w-20 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-center"
+                            />
+                          </div>
+                          <span className="text-slate-400 font-bold text-lg mt-4">→</span>
+                          <div className="text-center">
+                            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Pay Hours</p>
+                            <input
+                              type="number" min="0.5" step="0.5"
+                              value={localPayrollConfig.otPayRatio?.payHours ?? 1.5}
+                              onChange={(e) => {
+                                const pay = parseFloat(e.target.value) || 1;
+                                const actual = localPayrollConfig.otPayRatio?.actualHours ?? 1;
+                                setLocalPayrollConfig({
+                                  ...localPayrollConfig,
+                                  otPayRatio: { actualHours: actual, payHours: pay },
+                                  globalOtMultiplier: Math.round((pay / actual) * 100) / 100
+                                });
+                              }}
+                              className="w-20 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-center"
+                            />
+                          </div>
+                          <div className="mt-4 bg-indigo-100 text-indigo-700 px-3 py-2 rounded-xl text-center">
+                            <p className="text-[9px] font-black uppercase">Multiplier</p>
+                            <p className="text-sm font-black">{localPayrollConfig.globalOtMultiplier ?? 1.5}×</p>
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-indigo-600 font-semibold mt-3">
+                          e.g. Work {localPayrollConfig.otPayRatio?.actualHours ?? 1}h actual → get paid for {localPayrollConfig.otPayRatio?.payHours ?? 1.5}h
+                        </p>
+                      </div>
+
+                      {/* Manual override still available */}
+                      <div className="pt-3 border-t border-slate-200">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Or set Multiplier directly</label>
                         <div className="flex items-center gap-3 mt-1">
-                          <input 
-                            type="number" 
-                            step="0.1"
+                          <input
+                            type="number" step="0.05"
                             value={localPayrollConfig.globalOtMultiplier}
-                            onChange={(e) => setLocalPayrollConfig({...localPayrollConfig, globalOtMultiplier: parseFloat(e.target.value)})}
+                            onChange={(e) => {
+                              const mult = parseFloat(e.target.value) || 1;
+                              const actual = localPayrollConfig.otPayRatio?.actualHours ?? 1;
+                              setLocalPayrollConfig({
+                                ...localPayrollConfig,
+                                globalOtMultiplier: mult,
+                                otPayRatio: { actualHours: actual, payHours: Math.round(actual * mult * 100) / 100 }
+                              });
+                            }}
                             className="w-24 px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500"
                           />
                           <span className="text-xs text-slate-400 font-medium">x Hourly Rate</span>

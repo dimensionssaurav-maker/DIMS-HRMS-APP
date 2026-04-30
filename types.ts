@@ -30,6 +30,7 @@ export interface OTRule {
 
 export interface PayrollConfig {
   globalOtMultiplier: number;
+  otPayRatio?: { actualHours: number; payHours: number };
   designationOverrides: Record<string, number>;
   foodingConfig: {
     enabled: boolean;
