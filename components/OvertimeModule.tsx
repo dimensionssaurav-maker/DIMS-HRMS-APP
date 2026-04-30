@@ -121,7 +121,13 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
       });
     const joined = recordsInPeriod.map(r => {
       const emp = employees.find(e => e.id === r.employeeId); if (!emp) return null;
-      const shift = getShift(emp); const hourlyRate = (Number(emp.dailyWage) || 0) / (shift?.workingHours ?? 8);
+      const shift = getShift(emp);
+      const _sd = new Date(startDate);
+      const _dim = new Date(_sd.getFullYear(), _sd.getMonth() + 1, 0).getDate();
+      const _dailyRate = emp.salaryType === 'Monthly'
+        ? (Number(emp.monthlySalary) || 0) / _dim
+        : (Number(emp.dailyWage) || 0);
+      const hourlyRate = _dailyRate / 8;
       const rawMult = (payrollConfig.designationOverrides ?? {})[emp.designation] ?? payrollConfig.globalOtMultiplier;
       const multiplier = (rawMult != null && !isNaN(Number(rawMult))) ? Number(rawMult) : 1;
       let slabBreakdown: OTSlabResult[] = []; let otAmount = 0; let isTieredApplied = false; let payableHours = r.overtimeHours;
