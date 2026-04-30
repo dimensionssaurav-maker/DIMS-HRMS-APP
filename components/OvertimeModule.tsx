@@ -55,6 +55,40 @@ const SLAB_COLOURS: Record<string, { bg: string; text: string }> = {
 };
 function slabColour(name: string) { return SLAB_COLOURS[name] ?? { bg: 'bg-indigo-100', text: 'text-indigo-800' }; }
 
+// OT recalculation from punch times (floor to nearest 0.5h)
+// ALWAYS prefers punch time recalculation over stored value.
+function recalcOT(record: any, emp: Employee, shift: Shift | undefined): number {
+  if (!emp?.isOtAllowed) return 0;
+  const checkIn  = record.checkIn  || record.punchIn  || '';
+  const checkOut = record.checkOut || record.punchOut || '';
+  // No punch times -> fall back to stored value (floored)
+  if (!checkIn || !checkOut) {
+    return Math.floor((record.overtimeHours ?? 0) * 2) / 2;
+  }
+  if (!shift) {
+    return Math.floor((record.overtimeHours ?? 0) * 2) / 2;
+  }
+  const toM = (t: string): number => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  const isSunday = new Date(record.date).getDay() === 0;
+  if (isSunday && shift.sundaySchedule?.enabled) {
+    const sd = shift.sundaySchedule;
+    let sunEnd = toM(sd.endTime); let ciM = toM(checkIn); let coM = toM(checkOut);
+    if (sunEnd < toM(sd.startTime)) sunEnd += 1440;
+    if (coM < ciM) coM += 1440;
+    const worked = (coM - ciM) / 60;
+    if (sd.isFullDayOvertime) {
+      const raw = worked >= 7 ? Math.max(8, worked) : worked;
+      return Math.floor(raw * 2) / 2;
+    }
+    let cOut = coM; if (cOut < sunEnd - 600) cOut += 1440;
+    return Math.floor(Math.max(0, (cOut - sunEnd) / 60) * 2) / 2;
+  }
+  const shiftEndMins = toM(shift.endTime);
+  let cOut = toM(checkOut);
+  if (cOut < shiftEndMins - 600) cOut += 1440;
+  return Math.floor(Math.max(0, (cOut - shiftEndMins) / 60) * 2) / 2;
+}
+
 interface Props {
   employees: Employee[]; attendanceRecords: AttendanceRecord[]; departments: string[];
   shifts: Shift[]; startDate: string; endDate: string;
@@ -72,42 +106,24 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return [];
     const deduped = new Map<string, typeof attendanceRecords[0]>();
     for (const r of attendanceRecords) deduped.set(r.employeeId + '-' + r.date, r);
-    // Recalculate OT from punch times if stored value is 0/missing
-    const toMinsOT = (t: string) => { if (!t) return 0; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-    const recalcOT = (r: any, emp: any, shift: any): number => {
-      if ((r.overtimeHours ?? 0) > 0) return r.overtimeHours; // already set
-      if (!emp?.isOtAllowed) return 0;
-      const checkIn = r.checkIn || r.punchIn || '';
-      const checkOut = r.checkOut || r.punchOut || '';
-      if (!checkIn || !checkOut || !shift) return 0;
-      const dayOfWeek = new Date(r.date).getDay();
-      const isSunday = dayOfWeek === 0;
-      const sundayCfg = shift.sundaySchedule;
-      if (isSunday && sundayCfg?.enabled && sundayCfg.isFullDayOvertime) {
-        let totalMins = toMinsOT(checkOut) - toMinsOT(checkIn);
-        if (totalMins < 0) totalMins += 1440;
-        const totalHrs = totalMins / 60;
-        return totalHrs >= 7 ? Math.max(8, Math.round(totalHrs * 100) / 100) : Math.round(totalHrs * 100) / 100;
-      }
-      const shiftEndStr = (isSunday && sundayCfg?.enabled) ? sundayCfg.endTime : shift.endTime;
-      let coMins = toMinsOT(checkOut);
-      const seMins = toMinsOT(shiftEndStr);
-      if (coMins < seMins - 600) coMins += 1440;
-      const otMins = coMins - seMins;
-      return otMins > 0 ? Math.round((otMins / 60) * 100) / 100 : 0;
-    };
+    // recordsInPeriod: use module-level recalcOT (always calcs from punch times, floors to 0.5h)
     const recordsInPeriod = Array.from(deduped.values())
       .map(r => {
         const emp = employees.find(e => e.id === r.employeeId);
-        const shift = emp?.shiftId ? shifts?.find((s: any) => s.id === emp.shiftId) : undefined;
-        const ot = recalcOT(r, emp, shift);
-        return ot > 0 ? { ...r, overtimeHours: ot } : r;
+        const shift = getShift(emp as Employee);
+        const ot = recalcOT(r, emp as Employee, shift);
+        return { ...r, overtimeHours: ot };
       })
-      .filter(r => { const d = new Date(r.date); return d >= start && d <= end && r.overtimeHours > 0; });
+      .filter(r => {
+        const d = new Date(r.date);
+        const emp = employees.find(e => e.id === r.employeeId);
+        return d >= start && d <= end && emp?.isOtAllowed && r.overtimeHours > 0;
+      });
     const joined = recordsInPeriod.map(r => {
       const emp = employees.find(e => e.id === r.employeeId); if (!emp) return null;
-      const shift = getShift(emp); const hourlyRate = emp.dailyWage / (shift?.workingHours ?? 8);
-      const multiplier = (payrollConfig.designationOverrides ?? {})[emp.designation] ?? payrollConfig.globalOtMultiplier;
+      const shift = getShift(emp); const hourlyRate = (Number(emp.dailyWage) || 0) / (shift?.workingHours ?? 8);
+      const rawMult = (payrollConfig.designationOverrides ?? {})[emp.designation] ?? payrollConfig.globalOtMultiplier;
+      const multiplier = (rawMult != null && !isNaN(Number(rawMult))) ? Number(rawMult) : 1;
       let slabBreakdown: OTSlabResult[] = []; let otAmount = 0; let isTieredApplied = false; let payableHours = r.overtimeHours;
       // ── Factory OT slabs (highest priority) ──
       const factoryCfg = payrollConfig.factoryOTConfig;
@@ -130,7 +146,8 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
         otAmount = emp.isOtAllowed ? Math.round(payableHours * hourlyRate * multiplier) : 0;
       } else if (!isTieredApplied) { otAmount = emp.isOtAllowed ? Math.round(r.overtimeHours * hourlyRate * multiplier) : 0; }
       let foodingAmount = 0;
-      if (emp.isOtAllowed && payrollConfig.foodingConfig.enabled) {
+      const isSundayRec = new Date(r.date).getDay() === 0;
+      if (!isSundayRec && emp.isOtAllowed && payrollConfig.foodingConfig?.enabled) {
         const dr = payrollConfig.foodingConfig.departmentOverrides?.[emp.department];
         const minHours = dr ? dr.minHours : payrollConfig.foodingConfig.minHours;
         const allowance = dr ? dr.amount : payrollConfig.foodingConfig.amount;

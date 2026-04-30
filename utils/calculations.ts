@@ -8,17 +8,19 @@ import {
 import type { Shift } from '../types';
 
 // ── OT recalculation from punch times (mirrors AttendanceTracker logic) ──
+// ALWAYS prefers punch time recalculation. Stored overtimeHours may be from old
+// threshold-based biometric sync and cannot be trusted when punch times are available.
 function recalcOTFromPunch(record: any, employee: any, shifts: Shift[]): number {
-  // Trust stored OT if explicitly saved as > 0
-  if ((record.overtimeHours ?? 0) > 0) return record.overtimeHours;
   if (!employee.isOtAllowed) return 0;
 
   const checkIn  = record.checkIn  || record.punchIn  || '';
   const checkOut = record.checkOut || record.punchOut || '';
-  if (!checkIn || !checkOut) return 0;
+
+  // No punch times -> fall back to stored value (manual entry)
+  if (!checkIn || !checkOut) return (record.overtimeHours ?? 0);
 
   const shift = shifts.find((s: Shift) => s.id === employee.shiftId);
-  if (!shift) return 0;
+  if (!shift) return (record.overtimeHours ?? 0);
 
   const toM = (t: string): number => {
     const [h, m] = t.split(':').map(Number);
