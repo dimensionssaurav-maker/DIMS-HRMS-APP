@@ -221,40 +221,20 @@ const BiometricSync: React.FC<Props> = ({ employees, onAttendanceSynced, onEmplo
       const authStr = etoCreds.corporateId + ':' + etoCreds.username + ':' + etoCreds.password + ':true';
       const authB64 = btoa(authStr);
 
-      const url = 'https://api.etimeoffice.com/api/DownloadInOutPunchData?Empcode=ALL&FromDate=' + encodeURIComponent(fromApi) + '&ToDate=' + encodeURIComponent(toApi);
+      // Use Vercel serverless proxy to avoid CORS — /api/etimeoffice routes server-side to api.etimeoffice.com
+      const proxyUrl = '/api/etimeoffice?from=' + encodeURIComponent(fromApi) +
+        '&to=' + encodeURIComponent(toApi) +
+        '&empcode=ALL' +
+        '&auth=' + encodeURIComponent(authB64);
 
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 30000);
       let resp: Response;
       try {
-        resp = await fetch(url, { headers: { 'Authorization': 'Basic ' + authB64 }, signal: ctrl.signal });
+        resp = await fetch(proxyUrl, { signal: ctrl.signal });
       } catch (netErr: any) {
         clearTimeout(timer);
-        // Most likely CORS block — fall back to the bridge as a server-side proxy
-        if (config.bridgeUrl) {
-          const proxyUrl = config.bridgeUrl.replace(/\/$/, '') +
-            '/etime/inout?corporateId=' + encodeURIComponent(etoCreds.corporateId) +
-            '&username=' + encodeURIComponent(etoCreds.username) +
-            '&password=' + encodeURIComponent(etoCreds.password) +
-            '&from=' + encodeURIComponent(fromApi) + '&to=' + encodeURIComponent(toApi);
-          try {
-            const pCtrl = new AbortController();
-            const pTimer = setTimeout(() => pCtrl.abort(), 30000);
-            const pResp = await fetch(proxyUrl, { signal: pCtrl.signal });
-            clearTimeout(pTimer);
-            if (!pResp.ok) throw new Error('Bridge proxy returned ' + pResp.status);
-            resp = pResp;
-          } catch (proxyErr: any) {
-            throw new Error(
-              'Direct call blocked (likely CORS) and bridge proxy at ' + config.bridgeUrl +
-              ' failed too: ' + (proxyErr.message || 'unknown') +
-              '. Start the DIMS Bridge with the eTimeOffice proxy enabled.'
-            );
-          }
-        } else {
-          throw new Error('Network or CORS error: ' + (netErr.message || 'unknown') +
-            '. Set the DIMS Bridge URL in Device Configuration to use it as a proxy.');
-        }
+        throw new Error('Proxy fetch failed: ' + (netErr.message || 'unknown'));
       }
       clearTimeout(timer);
 
