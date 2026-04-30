@@ -26,7 +26,7 @@ function calcFactoryOTPayable(actualOTHours: number, slabs: {requiredHours: numb
     if (remaining >= slab.requiredHours) { payable += slab.requiredHours + slab.bonusHours; remaining -= slab.requiredHours; }
     else { payable += remaining; remaining = 0; break; }
   }
-  if (remaining > 0) payable += remaining;
+  // Do not add remaining beyond slabs
   return Math.round(payable * 100) / 100;
 }
 

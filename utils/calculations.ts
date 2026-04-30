@@ -204,8 +204,7 @@ export function calculateMonthlyPayroll(
 
   if (employee.isOtAllowed) {
     // Guard multiplier against undefined/NaN -> default to 1 (1x pay)
-    const rawMultiplier = config.designationOverrides?.[employee.designation] ?? config.globalOtMultiplier;
-    const multiplier = (rawMultiplier != null && !isNaN(Number(rawMultiplier))) ? Number(rawMultiplier) : 1;
+    const multiplier = 1; // No OT multiplier — pay at flat hourly rate
     let effectiveTotalPayableOT = 0;
 
     empAttendance.forEach(record => {

@@ -44,7 +44,8 @@ function calculateFactoryOTHours(actualOTHours: number, slabs: {requiredHours: n
     }
   }
   // Any hours beyond all configured slabs — pay actual (no bonus)
-  if (remaining > 0) payableHours += remaining;
+  // Do NOT add remaining hours beyond configured slabs
+  // (prevents Sunday 8h OT from becoming 9.5h payable)
 
   return Math.round(payableHours * 100) / 100;
 }
@@ -128,8 +129,7 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
         ? (Number(emp.monthlySalary) || 0) / _dim
         : (Number(emp.dailyWage) || 0);
       const hourlyRate = _dailyRate / 8;
-      const rawMult = (payrollConfig.designationOverrides ?? {})[emp.designation] ?? payrollConfig.globalOtMultiplier;
-      const multiplier = (rawMult != null && !isNaN(Number(rawMult))) ? Number(rawMult) : 1;
+      const multiplier = 1; // No OT multiplier — pay at flat hourly rate
       let slabBreakdown: OTSlabResult[] = []; let otAmount = 0; let isTieredApplied = false; let payableHours = r.overtimeHours;
       // ── Factory OT slabs (highest priority) ──
       const factoryCfg = payrollConfig.factoryOTConfig;
