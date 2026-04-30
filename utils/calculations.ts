@@ -39,7 +39,7 @@ function recalcOTFromPunch(record: any, employee: any, shifts: Shift[]): number 
     const workedHours = (coMins - ciMins) / 60;
 
     if (sd.isFullDayOvertime) {
-      // Sunday full-day OT: worked ≥ 7h → pay 8h (or actual if > 8)
+      // Sunday full-day OT: worked >= 7h -> pay 8h (or actual if > 8)
       if (workedHours >= 7) return Math.max(8, workedHours);
       return workedHours;
     }
@@ -58,7 +58,7 @@ function recalcOTFromPunch(record: any, employee: any, shifts: Shift[]): number 
   return otMinutes > 0 ? otMinutes / 60 : 0;
 }
 
-// ── Status normalizer helpers (module-level to avoid TDZ in minified build) ──
+// -- Status normalizer helpers (module-level to avoid TDZ in minified build) --
 function isPresentStatus(s: string): boolean {
   const v = String(s || '').toUpperCase();
   return v === 'PRESENT' || v === 'P' || v.startsWith('P/');
@@ -115,7 +115,7 @@ export function calculateMonthlyPayroll(
   const monthIndex = new Date(`${month} 1, 2000`).getMonth();
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
 
-  // ── READ DAYS PAID DIRECTLY FROM ATTENDANCE — same source as attendance page ──
+  // -- READ DAYS PAID DIRECTLY FROM ATTENDANCE -- same source as attendance page --
   // Build full-month day list (identical to AttendanceTracker monthDays)
   const allMonthDays: string[] = [];
   for (let d = 1; d <= daysInMonth; d++) {
@@ -153,10 +153,10 @@ export function calculateMonthlyPayroll(
     }
   });
 
-  // OT: recalculate from punch times if stored value is 0, then floor to whole hours
+  // OT: recalculate from punch times if stored value is 0, then floor to nearest 0.5h
   const totalOvertimeHours = empAttendance.reduce((acc, curr) => {
     const raw = recalcOTFromPunch(curr, employee, shifts);
-    return acc + Math.floor(raw); // floor: 3.52→3, 0.82→0
+    return acc + Math.floor(raw * 2) / 2; // floor to 0.5h: 3.52->3.5, 6.12->6.0
   }, 0);
   const totalLateMinutes = empAttendance.reduce((acc, curr) => acc + (Number(curr.lateMinutes) || 0), 0);
 
@@ -181,20 +181,20 @@ export function calculateMonthlyPayroll(
   let foodingAllowance = 0;
 
   if (employee.isOtAllowed) {
-    // Guard multiplier against undefined/NaN → default to 1 (1× pay)
+    // Guard multiplier against undefined/NaN -> default to 1 (1x pay)
     const rawMultiplier = config.designationOverrides?.[employee.designation] ?? config.globalOtMultiplier;
     const multiplier = (rawMultiplier != null && !isNaN(Number(rawMultiplier))) ? Number(rawMultiplier) : 1;
     let effectiveTotalPayableOT = 0;
 
     empAttendance.forEach(record => {
-      // Recalculate OT from punch times; floor to whole hours
+      // Recalculate OT from punch times; floor to nearest 0.5h
       const rawOT = recalcOTFromPunch(record, employee, shifts);
-      const flooredOT = Math.floor(rawOT); // 3.52→3, 0.82→0
-      if (flooredOT <= 0) return;          // skip if < 1 whole OT hour
+      const flooredOT = Math.floor(rawOT * 2) / 2; // 3.52->3.5, 6.12->6.0
+      if (flooredOT <= 0) return;                   // skip if no OT
 
       let dailyPayableHours = flooredOT;
 
-      // Apply global OT rules (threshold → payout remapping)
+      // Apply global OT rules (threshold -> payout remapping)
       if (config.otConfig?.enabled && config.otConfig.rules && config.otConfig.rules.length > 0) {
         const otMinutes = flooredOT * 60;
         const applicableRules = config.otConfig.rules.filter((r: any) =>
@@ -222,8 +222,8 @@ export function calculateMonthlyPayroll(
 
   let totalLateHours  = 0;
   let totalEarlyHours = 0;
-  let lateCount  = 0;   // instances that actually triggered a deduction (after exemptions)
-  let earlyCount = 0;   // instances that actually triggered a deduction (after exemptions)
+  let lateCount  = 0;
+  let earlyCount = 0;
   const hourlyRateForDeduction = hourlyRate;
   const lateRuleUsage:  Record<string, number> = {};
   const earlyRuleUsage: Record<string, number> = {};
@@ -240,9 +240,8 @@ export function calculateMonthlyPayroll(
       const bS = b.department && b.department !== 'All Departments';
       if (aS && !bS) return -1;
       if (!aS && bS) return 1;
-      return a.thresholdMinutes - b.thresholdMinutes; // ascending: match lowest slab first
+      return a.thresholdMinutes - b.thresholdMinutes;
     });
-    // Slab match: minutes > thresholdMinutes AND (no maxMinutes OR minutes <= maxMinutes)
     return sortedRules.find(r =>
       minutes > r.thresholdMinutes &&
       (r.maxMinutes === undefined || r.maxMinutes === null || minutes <= r.maxMinutes)
@@ -295,4 +294,69 @@ export function calculateMonthlyPayroll(
         const cDate = new Date(c.date);
         return c.employeeId === employee.id &&
                c.status === 'Approved' &&
-               cDate.t
+               cDate.toLocaleString('default', { month: 'long' }) === month &&
+               cDate.getFullYear() === year;
+      })
+      .reduce((sum, c) => sum + c.amount, 0);
+  }
+
+  // ESIC only applies to employees with monthly salary <= 21,000 (statutory ceiling)
+  const ESIC_SALARY_CEILING = 21000;
+  const isEsicApplicable = monthlySal <= ESIC_SALARY_CEILING && monthlySal > 0;
+  const esicEmployeeShare = isEsicApplicable ? Math.round(grossSalary * ESIC_EMPLOYEE_RATE * 100) / 100 : 0;
+  const esicEmployerShare = isEsicApplicable ? Math.round(grossSalary * ESIC_EMPLOYER_RATE * 100) / 100 : 0;
+
+  let lwfEmployeeShare = 0;
+  let lwfEmployerShare = 0;
+  if (grossSalary > 0) {
+    lwfEmployeeShare = Math.round(Math.min(grossSalary * LWF_EMPLOYEE_RATE, LWF_EMPLOYEE_CAP) * 100) / 100;
+    lwfEmployerShare = Math.round(lwfEmployeeShare * 2 * 100) / 100;
+  }
+
+  const payrollDate = new Date(year, monthIndex, 1);
+  let totalLoanDeduction = 0;
+  loans.filter(l => l.employeeId === employee.id).forEach(loan => {
+    const loanDate        = new Date(loan.issueDate);
+    const loanStartPeriod = new Date(loanDate.getFullYear(), loanDate.getMonth(), 1);
+    const loanEndPeriod   = new Date(loanStartPeriod);
+    loanEndPeriod.setMonth(loanEndPeriod.getMonth() + loan.tenureMonths);
+    if (payrollDate >= loanStartPeriod && payrollDate < loanEndPeriod)
+      totalLoanDeduction += loan.amount / loan.tenureMonths;
+  });
+  totalLoanDeduction = Math.round(totalLoanDeduction * 100) / 100;
+
+  const netPayable        = grossSalary + expenseReimbursement - lateDeduction - earlyDeduction - esicEmployeeShare - lwfEmployeeShare - totalLoanDeduction;
+  const roundedNetPayable = Math.round(netPayable * 100) / 100;
+
+  const effectiveServiceRate = employee.serviceChargeRate !== undefined ? employee.serviceChargeRate : SERVICE_CHARGE_RATE;
+  const serviceCharge = Math.round(grossSalary * effectiveServiceRate * 100) / 100;
+
+  return {
+    employeeId: employee.id,
+    month,
+    year,
+    daysPresent,
+    daysAbsent,
+    holidays: totalPaidHolidays,
+    totalOvertimeHours,
+    totalLateMinutes,
+    basicSalary: roundedBasicSalary,
+    grossSalary,
+    overtimePay,
+    foodingAllowance,
+    expenseReimbursement,
+    esicEmployeeShare,
+    esicEmployerShare,
+    lwfEmployeeShare,
+    lwfEmployerShare,
+    serviceCharge,
+    loanDeduction: totalLoanDeduction,
+    lateDeduction,
+    earlyDeduction,
+    lateCount,
+    earlyCount,
+    lateHours: Math.round(totalLateHours * 100) / 100,
+    earlyHours: Math.round(totalEarlyHours * 100) / 100,
+    netPayable: roundedNetPayable
+  };
+}
