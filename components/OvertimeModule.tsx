@@ -91,7 +91,7 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
         }
       }
 
-      } else if (!isTieredApplied && payrollConfig.otConfig?.enabled && payrollConfig.otConfig.rules?.length > 0) {
+      if (!isTieredApplied && payrollConfig.otConfig?.enabled && payrollConfig.otConfig.rules?.length > 0) {
         const otMins = r.overtimeHours * 60;
         const rules = payrollConfig.otConfig.rules.filter(rule => rule.enabled && (rule.department === 'All Departments' || rule.department === emp.department)).sort((a, b) => b.thresholdMinutes - a.thresholdMinutes);
         const matched = rules.find(rule => otMins >= rule.thresholdMinutes);
