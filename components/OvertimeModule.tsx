@@ -9,43 +9,7 @@ import {
 } from 'lucide-react';
 import { Employee, AttendanceRecord, PayrollConfig, Shift } from '../types';
 
-interface OTSlab {
-  id: string; name: string; startTime: string; endTime: string;
-  multiplier: number; crossesMidnight: boolean; enabled: boolean;
-}
-interface OTSlabResult {
-  slabName: string; minutes: number; hours: number; multiplier: number; amount: number;
-}
 function toMins(t: string): number { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
-function distributeOTAcrossSlabs(overtimeHours: number, shiftEnd: string, slabs: OTSlab[], hourlyBase: number): OTSlabResult[] {
-  if (!overtimeHours || overtimeHours <= 0 || !slabs?.length) return [];
-  let remaining = overtimeHours * 60; let cursor = toMins(shiftEnd);
-  const shiftEndMins = toMins(shiftEnd); const results: OTSlabResult[] = [];
-  const sorted = [...slabs].filter(s => s.enabled).sort((a, b) => {
-    let as2 = toMins(a.startTime); let bs2 = toMins(b.startTime);
-    if (as2 < shiftEndMins) as2 += 1440; if (bs2 < shiftEndMins) bs2 += 1440; return as2 - bs2;
-  });
-  for (const slab of sorted) {
-    if (remaining <= 0) break;
-    let slabStart = toMins(slab.startTime); let slabEnd = toMins(slab.endTime);
-    if (slab.crossesMidnight || slabEnd <= slabStart) slabEnd += 1440;
-    if (slabStart < shiftEndMins) slabStart += 1440;
-    const slabAvail = Math.max(0, slabEnd - Math.max(cursor, slabStart));
-    const used = Math.min(remaining, slabAvail); if (used <= 0) continue;
-    cursor = Math.max(cursor, slabStart) + used; remaining -= used;
-    const hours = Math.round((used / 60) * 100) / 100;
-    const amount = Math.round(hours * hourlyBase * slab.multiplier);
-    results.push({ slabName: slab.name, minutes: used, hours, multiplier: slab.multiplier, amount });
-  }
-  if (remaining > 0) {
-    const lastSlab = sorted[sorted.length - 1]; const multiplier = lastSlab?.multiplier ?? 1;
-    const hours = Math.round((remaining / 60) * 100) / 100;
-    const amount = Math.round(hours * hourlyBase * multiplier);
-    results.push({ slabName: lastSlab ? lastSlab.name + ' (ext.)' : 'OT', minutes: remaining, hours, multiplier, amount });
-  }
-  return results;
-}
-function totalOTPayFromSlabs(slabResults: OTSlabResult[]): number { return slabResults.reduce((sum, s) => sum + s.amount, 0); }
 
 // ── Factory OT slab calculation ──────────────────────────────────────────────
 // Slab 1: if actual < required → 0 OT (minimum not met)
@@ -123,11 +87,6 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
         }
       }
 
-      const otSlabs = (shift as any)?.otSlabs as OTSlab[] | undefined;
-      if (!isTieredApplied && otSlabs && otSlabs.length > 0) {
-        slabBreakdown = distributeOTAcrossSlabs(r.overtimeHours, shift!.endTime, otSlabs, hourlyRate);
-        otAmount = emp.isOtAllowed ? totalOTPayFromSlabs(slabBreakdown) : 0;
-        payableHours = Math.round(slabBreakdown.reduce((s, b) => s + b.hours, 0) * 100) / 100; isTieredApplied = true;
       } else if (!isTieredApplied && payrollConfig.otConfig?.enabled && payrollConfig.otConfig.rules?.length > 0) {
         const otMins = r.overtimeHours * 60;
         const rules = payrollConfig.otConfig.rules.filter(rule => rule.enabled && (rule.department === 'All Departments' || rule.department === emp.department)).sort((a, b) => b.thresholdMinutes - a.thresholdMinutes);

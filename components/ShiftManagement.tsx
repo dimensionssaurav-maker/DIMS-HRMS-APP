@@ -15,7 +15,7 @@ import {
   Check,
   CalendarCheck
 } from 'lucide-react';
-import { Shift, OTSlab } from '../types';
+import { Shift } from '../types';
 
 
 
@@ -25,99 +25,7 @@ const calcWorkHours = (start: string, end: string, breakMins: number): number =>
   if (e <= s) e += 1440; // night shift
   return Math.round(((e - s - breakMins) / 60) * 100) / 100;
 };
-const slabsOverlap = (a: OTSlab, b: OTSlab): boolean => {
-  const range = (sl: OTSlab): [number, number] => {
-    let s = toMins(sl.startTime), e = toMins(sl.endTime);
-    if (sl.crossesMidnight || e <= s) e += 1440;
-    return [s, e];
-  };
-  const [as2, ae] = range(a);
-  const [bs, be] = range(b);
-  return as2 < be && bs < ae;
-};
-const getSlabConflicts = (slabs: OTSlab[]): Set<string> => {
-  const enabled = slabs.filter(s => s.enabled);
-  const ids = new Set<string>();
-  for (let i = 0; i < enabled.length; i++)
-    for (let j = i + 1; j < enabled.length; j++)
-      if (slabsOverlap(enabled[i], enabled[j])) { ids.add(enabled[i].id); ids.add(enabled[j].id); }
-  return ids;
-};
 
-const DEFAULT_OT_SLABS: OTSlab[] = [
-  { id: 'slab1', name: 'Normal OT', startTime: '17:30', endTime: '21:00', multiplier: 1.5, crossesMidnight: false, enabled: true },
-  { id: 'slab2', name: 'Half Night OT', startTime: '21:00', endTime: '00:00', multiplier: 2.0, crossesMidnight: true, enabled: true },
-  { id: 'slab3', name: 'Full Night OT', startTime: '00:00', endTime: '06:00', multiplier: 2.5, crossesMidnight: false, enabled: true },
-];
-
-interface OTSlabEditorProps { slabs: OTSlab[]; onChange: (slabs: OTSlab[]) => void; }
-
-const OTSlabEditor: React.FC<OTSlabEditorProps> = ({ slabs, onChange }) => {
-  const conflicts = getSlabConflicts(slabs);
-  const update = (idx: number, field: keyof OTSlab, val: any) => {
-    let next = slabs.map((s, i) => i === idx ? { ...s, [field]: val } : s);
-    // Auto-set crossesMidnight when endTime < startTime
-    if (field === 'startTime' || field === 'endTime') {
-      const sl = next[idx];
-      const autoCross = toMins(sl.endTime) <= toMins(sl.startTime);
-      next = next.map((s, i) => i === idx ? { ...s, crossesMidnight: autoCross } : s);
-    }
-    onChange(next);
-  };
-  const addSlab = () => {
-    const newSlab: OTSlab = { id: 'slab_' + Date.now(), name: 'New OT Slab', startTime: '21:00', endTime: '23:00', multiplier: 1.5, crossesMidnight: false, enabled: true };
-    onChange([...slabs, newSlab]);
-  };
-  const removeSlab = (idx: number) => onChange(slabs.filter((_, i) => i !== idx));
-  return (
-    <div className="mt-4 border border-indigo-100 rounded-xl p-4 bg-indigo-50/40">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Clock size={16} className="text-indigo-600" />
-          <h4 className="text-sm font-bold text-slate-700">OT Time Slabs</h4>
-          <span className="text-xs text-slate-400">(time-based multipliers after shift end)</span>
-        </div>
-        <button type="button" onClick={addSlab} className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 px-2 py-1 rounded-lg">
-          <Plus size={12}/> Add Slab
-        </button>
-      </div>
-      <div className="space-y-2">
-        {slabs.some(s => s.enabled && conflicts.has(s.id)) && (
-          <div className="flex items-center gap-2 mb-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs font-bold text-red-700">
-            ⚠️ Overlapping time slabs detected — fix before saving to avoid double-counting OT.
-          </div>
-        )}
-        {slabs.map((slab, idx) => (
-          <div key={slab.id} className={"rounded-lg p-3 border " + (conflicts.has(slab.id) ? 'bg-red-50 border-red-300' : slab.enabled ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100 opacity-60')}>
-            <div className="flex items-center gap-2 mb-2">
-              <input type="checkbox" checked={slab.enabled} onChange={e => update(idx, 'enabled', e.target.checked)} className="rounded" />
-              <input type="text" value={slab.name} onChange={e => update(idx, 'name', e.target.value)} className="flex-1 text-sm font-bold text-slate-700 border border-slate-200 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" placeholder="Slab Name"/>
-              <button type="button" onClick={() => removeSlab(idx)} className="text-red-400 hover:text-red-600 ml-auto">
-                <Trash2 size={14}/>
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              <div>
-                <label className="text-slate-400 font-semibold block mb-0.5">Start Time</label>
-                <input type="time" value={slab.startTime} onChange={e => update(idx, 'startTime', e.target.value)} className="w-full border border-slate-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-xs"/>
-              </div>
-              <div>
-                <label className="text-slate-400 font-semibold block mb-0.5">End Time</label>
-                <input type="time" value={slab.endTime} onChange={e => update(idx, 'endTime', e.target.value)} className="w-full border border-slate-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-xs"/>
-              </div>
-              <div>
-                <label className="text-slate-400 font-semibold block mb-0.5">Multiplier (x)</label>
-                <input type="number" value={slab.multiplier} step="0.25" min="1" max="5" onChange={e => update(idx, 'multiplier', parseFloat(e.target.value))} className="w-full border border-slate-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-xs font-bold text-indigo-700"/>
-              </div>
-
-            </div>
-          </div>
-        ))}
-      </div>
-      <p className="text-[10px] text-slate-400 mt-2">OT hours are automatically split across these slabs in sequence after shift end time.</p>
-    </div>
-  );
-};
 interface Props {
   shifts: Shift[];
   onAdd: (shift: Shift) => void;
@@ -147,8 +55,7 @@ const ShiftManagement: React.FC<Props> = ({ shifts, onAdd, onUpdate, onDelete })
         endTime: '16:00',
         isFullDayOvertime: true
     }
-  ,
-    otSlabs: DEFAULT_OT_SLABS
+  
   });
 
   // Calculate Stats
@@ -204,20 +111,13 @@ const ShiftManagement: React.FC<Props> = ({ shifts, onAdd, onUpdate, onDelete })
             startTime: '09:00',
             endTime: '16:00',
             isFullDayOvertime: true
-        },
-        otSlabs: DEFAULT_OT_SLABS
+        }
     });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.site) return;
-    // Block save if OT slabs overlap
-    const activeSlabs = (formData.otSlabs as OTSlab[]) || [];
-    if (getSlabConflicts(activeSlabs).size > 0) {
-      alert('⚠️ Cannot save: OT time slabs are overlapping. Please fix the slab times before saving.');
-      return;
-    }
 
     if (editingId) {
       onUpdate({ ...formData, id: editingId } as Shift);
@@ -563,11 +463,7 @@ const ShiftManagement: React.FC<Props> = ({ shifts, onAdd, onUpdate, onDelete })
                     )}
                  </div>
 
-                 <OTSlabEditor
-                slabs={((formData.otSlabs as OTSlab[]) || DEFAULT_OT_SLABS)}
-                onChange={(slabs) => setFormData(prev => ({ ...prev, otSlabs: slabs }))}
-              />
-              <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
+                  <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
                     <button 
                        type="button"
                        onClick={() => setFormData({...formData, isNightShift: !formData.isNightShift})}
