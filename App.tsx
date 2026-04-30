@@ -628,7 +628,73 @@ export default function App() {
             <BiometricSync
               employees={employees}
               onAttendanceSynced={(records) => {
-                records.forEach(rec => handleAttendanceUpdate(rec));
+                const toMins = (t: string) => {
+                  if (!t) return 0;
+                  const [h, m] = t.split(':').map(Number);
+                  return h * 60 + m;
+                };
+                records.forEach(rec => {
+                  // Match employee
+                  const emp = employees.find(e =>
+                    e.id === rec.employeeId ||
+                    (e.employeeCode || e.id || '').toLowerCase() === (rec.empCode || '').toLowerCase()
+                  );
+                  const shift = emp?.shiftId ? shifts.find(s => s.id === emp.shiftId) : undefined;
+
+                  // Normalise punch fields → checkIn / checkOut
+                  const checkIn = rec.punchIn || rec.checkIn || '';
+                  const checkOut = rec.punchOut || rec.checkOut || '';
+
+                  // Late minutes
+                  let lateMinutes = 0;
+                  if (checkIn && shift) {
+                    const grace = shift.gracePeriodMinutes ?? 15;
+                    const shiftStartMins = toMins(shift.startTime);
+                    const checkInMins = toMins(checkIn);
+                    if (checkInMins > shiftStartMins + grace) {
+                      lateMinutes = checkInMins - shiftStartMins;
+                    }
+                  }
+
+                  // OT = time worked after shift end
+                  let overtimeHours = 0;
+                  if (checkIn && checkOut && emp?.isOtAllowed && shift) {
+                    const dayOfWeek = new Date(rec.date).getDay();
+                    const isSunday = dayOfWeek === 0;
+                    const sundayCfg = shift.sundaySchedule;
+
+                    if (isSunday && sundayCfg?.enabled && sundayCfg.isFullDayOvertime) {
+                      let totalMins = toMins(checkOut) - toMins(checkIn);
+                      if (totalMins < 0) totalMins += 1440;
+                      const totalHrs = totalMins / 60;
+                      overtimeHours = totalHrs >= 7
+                        ? Math.max(8, Math.round(totalHrs * 100) / 100)
+                        : Math.round(totalHrs * 100) / 100;
+                    } else {
+                      const shiftEndStr = (isSunday && sundayCfg?.enabled)
+                        ? sundayCfg.endTime
+                        : shift.endTime;
+                      let coMins = toMins(checkOut);
+                      const seMins = toMins(shiftEndStr);
+                      // Handle midnight crossing
+                      if (coMins < seMins - 600) coMins += 1440;
+                      const otMins = coMins - seMins;
+                      if (otMins > 0) {
+                        overtimeHours = Math.round((otMins / 60) * 100) / 100;
+                      }
+                    }
+                  }
+
+                  handleAttendanceUpdate({
+                    ...rec,
+                    checkIn,
+                    checkOut,
+                    overtimeHours,
+                    lateMinutes,
+                    earlyMinutes: rec.earlyMinutes || 0,
+                    status: rec.status || 'PRESENT',
+                  });
+                });
               }}
               onEmployeesSynced={async (newEmps) => {
                 await handleBulkAddEmployees(newEmps);
