@@ -4,6 +4,7 @@ import { collection, addDoc } from "firebase/firestore";
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Upload, Loader2, UserPlus, Edit2, Trash2, Building2, ArrowUpDown, ArrowUp, ArrowDown, AlertCircle, X, Save, Clock, Users, Wifi, ClipboardCopy, ArrowRight, Briefcase, IndianRupee, MapPin, Share2, Percent, MoreHorizontal, UserX, UserCheck, Calendar, RotateCcw, User, Camera, Check, FileText, Download } from 'lucide-react';
 import { Employee, Shift, PayrollConfig } from '../types';
+import EmployeeDocuments from './EmployeeDocuments';
 
 interface Props {
   employees: Employee[];
@@ -34,6 +35,7 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showJoiningForm, setShowJoiningForm] = useState(false);
+  const [docsEmployee, setDocsEmployee] = useState<{empCode: string; empName: string} | null>(null);
   const [joinForms, setJoinForms] = useState<Record<string,string>[]>([]);
   const [loadingForms, setLoadingForms] = useState(false);
   const [showFormsModal, setShowFormsModal] = useState(false);
@@ -524,6 +526,7 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
                            {activeTab !== 'deleted' ? (
                                <>
                                    <button onClick={(e) => handleEditClick(e, emp)} className="w-full text-left px-4 py-3 text-sm font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 flex items-center gap-2"><Edit2 size={16} /> Edit Details</button>
+                                   <button onClick={() => { setOpenActionId(null); setDocsEmployee({ empCode: emp.employeeCode || emp.id, empName: emp.name }); }} className="w-full text-left px-4 py-3 text-sm font-bold text-slate-600 hover:bg-purple-50 hover:text-purple-600 flex items-center gap-2 border-t border-slate-50"><FileText size={16} /> Documents</button>
                                    {emp.status === 'Active' ? <button onClick={(e) => initiateMarkAsLeft(e, emp)} className="w-full text-left px-4 py-3 text-sm font-bold text-amber-600 hover:bg-amber-50 flex items-center gap-2 border-t border-slate-50"><UserX size={16} /> Mark as Left</button> : <button onClick={(e) => initiateReactivate(e, emp)} className="w-full text-left px-4 py-3 text-sm font-bold text-emerald-600 hover:bg-emerald-50 flex items-center gap-2 border-t border-slate-50"><UserCheck size={16} /> Re-activate</button>}
                                    <button onClick={(e) => initiateDelete(e, emp)} className="w-full text-left px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-50 flex items-center gap-2 border-t border-slate-50"><Trash2 size={16} /> Delete</button>
                                </>
@@ -991,6 +994,14 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
         <JoiningFormParser
           onClose={() => setShowJoiningForm(false)}
           onSaved={(_code, _name) => { setShowJoiningForm(false); }}
+        />
+      )}
+
+      {docsEmployee && (
+        <EmployeeDocuments
+          empCode={docsEmployee.empCode}
+          empName={docsEmployee.empName}
+          onClose={() => setDocsEmployee(null)}
         />
       )}
     </div>
