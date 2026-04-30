@@ -90,6 +90,7 @@ export interface Employee {
   serviceChargeRate?: number;
   // Profile
   avatar?: string;
+  mobileNo?: string;
 }
 
 export interface SystemUser {

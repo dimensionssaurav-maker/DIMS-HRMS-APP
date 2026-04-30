@@ -691,6 +691,15 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
                 </div>
               </div>
 
+              {/* Mobile Number */}
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase">Mobile Number</label>
+                <input type="tel" placeholder="e.g. 9876543210"
+                  value={editingEmployee.mobileNo || ''}
+                  onChange={e => setEditingEmployee({...editingEmployee, mobileNo: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none mt-1" />
+              </div>
+
               {/* Department & Designation */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -721,19 +730,32 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase">
-                      {editingEmployee.salaryType === 'Daily' ? 'Daily Wage (₹)' : 'Monthly Salary (₹)'}
-                    </label>
-                    <input type="number" min="0"
-                      value={editingEmployee.salaryType === 'Daily' ? editingEmployee.dailyWage : editingEmployee.monthlySalary}
-                      onChange={e => {
-                        const val = Number(e.target.value);
-                        setEditingEmployee({...editingEmployee,
-                          [editingEmployee.salaryType === 'Daily' ? 'dailyWage' : 'monthlySalary']: val,
-                          monthlyBase: editingEmployee.salaryType === 'Monthly' ? val : val * 30
-                        });
-                      }}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-lg font-black outline-none mt-1" />
+                    {editingEmployee.salaryType === 'Daily' ? (
+                      <>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Daily Wage (₹)</label>
+                        <input type="number" min="0"
+                          value={editingEmployee.dailyWage}
+                          onChange={e => {
+                            const val = Number(e.target.value);
+                            setEditingEmployee({...editingEmployee, dailyWage: val, monthlyBase: val * 30});
+                          }}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-lg font-black outline-none mt-1" />
+                      </>
+                    ) : (
+                      <>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Monthly Salary (₹)</label>
+                        <input type="number" min="0"
+                          value={editingEmployee.monthlySalary}
+                          onChange={e => {
+                            const val = Number(e.target.value);
+                            setEditingEmployee({...editingEmployee, monthlySalary: val, monthlyBase: val});
+                          }}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-lg font-black outline-none mt-1" />
+                        <p className="text-[10px] text-slate-400 mt-1.5 font-medium">
+                          Daily Wage (auto): ₹{((editingEmployee.monthlySalary || 0) / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()).toFixed(2)}
+                        </p>
+                      </>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase">OT Allowed</label>
