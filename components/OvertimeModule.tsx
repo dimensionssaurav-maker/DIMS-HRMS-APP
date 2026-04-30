@@ -263,7 +263,7 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
             <div className="text-right space-y-1"><div className="text-xs font-medium text-amber-700 bg-amber-100/50 px-2 py-1 rounded-lg">OT Pay: ₹{stats.totalOtCost.toLocaleString()}</div><div className="text-xs font-medium text-orange-700 bg-orange-100/50 px-2 py-1 rounded-lg">Fooding: ₹{stats.totalFoodingCost.toLocaleString()}</div></div>
           </div>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Hours Logged</p><div className="flex items-center gap-2"><Clock size={24} className="text-indigo-600"/><p className="text-3xl font-black text-slate-800">{stats.totalHours.toFixed(1)}</p><span className="text-sm font-bold text-slate-400 self-end mb-1">hrs</span></div></div>
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Hours Logged</p><div className="flex items-center gap-2"><Clock size={24} className="text-indigo-600"/><p className="text-3xl font-black text-slate-800">{stats.totalPayableHours.toFixed(1)}</p><span className="text-sm font-bold text-slate-400 self-end mb-1">hrs</span></div></div>
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Employees Contributing</p><div className="flex items-center gap-2"><TrendingUp size={24} className="text-emerald-600"/><p className="text-3xl font-black text-slate-800">{stats.uniqueEmployees}</p></div></div>
       </div>
       {slabSummary.length > 0 && (

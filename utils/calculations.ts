@@ -155,11 +155,7 @@ export function calculateMonthlyPayroll(
     }
   });
 
-  // OT: recalculate from punch times if stored value is 0, then floor to nearest 0.5h
-  const totalOvertimeHours = empAttendance.reduce((acc, curr) => {
-    const raw = recalcOTFromPunch(curr, employee, shifts);
-    return acc + Math.floor(raw * 2) / 2; // floor to 0.5h: 3.52->3.5, 6.12->6.0
-  }, 0);
+  let totalOvertimeHours = 0; // set after payable OT is computed (reflects slab rules)
   const totalLateMinutes = empAttendance.reduce((acc, curr) => acc + (Number(curr.lateMinutes) || 0), 0);
 
   const monthlySal = Number(employee.monthlySalary || (employee as any).salary || 0) || 0;
@@ -196,7 +192,7 @@ export function calculateMonthlyPayroll(
 
       let dailyPayableHours = flooredOT;
 
-      // Apply global OT rules (threshold -> payout remapping)
+      // Apply OT config rules if defined (threshold -> payout remapping)
       if (config.otConfig?.enabled && config.otConfig.rules && config.otConfig.rules.length > 0) {
         const otMinutes = flooredOT * 60;
         const applicableRules = config.otConfig.rules.filter((r: any) =>
@@ -220,6 +216,7 @@ export function calculateMonthlyPayroll(
     });
 
     overtimePay = effectiveTotalPayableOT * (isNaN(hourlyRate) ? 0 : hourlyRate) * multiplier;
+    totalOvertimeHours = effectiveTotalPayableOT; // payable hours (after slab remapping)
   }
 
   let totalLateHours  = 0;
