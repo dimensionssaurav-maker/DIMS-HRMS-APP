@@ -1,10 +1,62 @@
-import { 
-  ESIC_EMPLOYEE_RATE, 
-  ESIC_EMPLOYER_RATE, 
+import {
+  ESIC_EMPLOYEE_RATE,
+  ESIC_EMPLOYER_RATE,
   LWF_EMPLOYEE_RATE,
   LWF_EMPLOYEE_CAP,
-  SERVICE_CHARGE_RATE 
+  SERVICE_CHARGE_RATE
 } from '../constants';
+import type { Shift } from '../types';
+
+// ── OT recalculation from punch times (mirrors AttendanceTracker logic) ──
+function recalcOTFromPunch(record: any, employee: any, shifts: Shift[]): number {
+  // Trust stored OT if explicitly saved as > 0
+  if ((record.overtimeHours ?? 0) > 0) return record.overtimeHours;
+  if (!employee.isOtAllowed) return 0;
+
+  const checkIn  = record.checkIn  || record.punchIn  || '';
+  const checkOut = record.checkOut || record.punchOut || '';
+  if (!checkIn || !checkOut) return 0;
+
+  const shift = shifts.find((s: Shift) => s.id === employee.shiftId);
+  if (!shift) return 0;
+
+  const toM = (t: string): number => {
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  const dateObj = new Date(record.date);
+  const isSunday = dateObj.getDay() === 0;
+
+  if (isSunday && shift.sundaySchedule?.enabled) {
+    const sd = shift.sundaySchedule;
+    let sunStart = toM(sd.startTime);
+    let sunEnd   = toM(sd.endTime);
+    let ciMins   = toM(checkIn);
+    let coMins   = toM(checkOut);
+    if (sunEnd < sunStart) sunEnd += 1440;
+    if (coMins < ciMins)   coMins += 1440;
+    const workedHours = (coMins - ciMins) / 60;
+
+    if (sd.isFullDayOvertime) {
+      // Sunday full-day OT: worked ≥ 7h → pay 8h (or actual if > 8)
+      if (workedHours >= 7) return Math.max(8, workedHours);
+      return workedHours;
+    }
+    // Sunday with partial OT: OT = time after Sunday shift end
+    let cOut = coMins;
+    if (cOut < sunEnd - 600) cOut += 1440;
+    const otM = cOut - sunEnd;
+    return otM > 0 ? otM / 60 : 0;
+  }
+
+  // Standard shift: OT = time after shift end
+  const shiftEndMins = toM(shift.endTime);
+  let cOut = toM(checkOut);
+  if (cOut < shiftEndMins - 600) cOut += 1440;
+  const otMinutes = cOut - shiftEndMins;
+  return otMinutes > 0 ? otMinutes / 60 : 0;
+}
 
 // ── Status normalizer helpers (module-level to avoid TDZ in minified build) ──
 function isPresentStatus(s: string): boolean {
@@ -27,14 +79,15 @@ function isHalfDayStatus(s: string): boolean {
 }
 
 export function calculateMonthlyPayroll(
-  employee: Employee, 
-  attendance: AttendanceRecord[], 
+  employee: Employee,
+  attendance: AttendanceRecord[],
   loans: Loan[],
   claims: ExpenseClaim[],
   holidays: Holiday[],
-  month: string, 
+  month: string,
   year: number,
-  config: PayrollConfig
+  config: PayrollConfig,
+  shifts: Shift[] = []
 ): PayrollCalculation {
   const empCode = (employee as any).employeeCode || employee.id;
   const empAttendance = attendance
@@ -100,8 +153,12 @@ export function calculateMonthlyPayroll(
     }
   });
 
-  const totalOvertimeHours = empAttendance.reduce((acc, curr) => acc + (Number(curr.overtimeHours) || 0), 0);
-  const totalLateMinutes   = empAttendance.reduce((acc, curr) => acc + (Number(curr.lateMinutes) || 0), 0);
+  // OT: recalculate from punch times if stored value is 0, then floor to whole hours
+  const totalOvertimeHours = empAttendance.reduce((acc, curr) => {
+    const raw = recalcOTFromPunch(curr, employee, shifts);
+    return acc + Math.floor(raw); // floor: 3.52→3, 0.82→0
+  }, 0);
+  const totalLateMinutes = empAttendance.reduce((acc, curr) => acc + (Number(curr.lateMinutes) || 0), 0);
 
   const monthlySal = Number(employee.monthlySalary || (employee as any).salary || 0) || 0;
   const dailyWage  = Number(employee.dailyWage || 0) || 0;
@@ -124,34 +181,43 @@ export function calculateMonthlyPayroll(
   let foodingAllowance = 0;
 
   if (employee.isOtAllowed) {
-    const multiplier = config.designationOverrides[employee.designation] ?? config.globalOtMultiplier;
+    // Guard multiplier against undefined/NaN → default to 1 (1× pay)
+    const rawMultiplier = config.designationOverrides?.[employee.designation] ?? config.globalOtMultiplier;
+    const multiplier = (rawMultiplier != null && !isNaN(Number(rawMultiplier))) ? Number(rawMultiplier) : 1;
     let effectiveTotalPayableOT = 0;
 
     empAttendance.forEach(record => {
-      if (!record.overtimeHours) return;
-      let dailyPayableHours = record.overtimeHours;
+      // Recalculate OT from punch times; floor to whole hours
+      const rawOT = recalcOTFromPunch(record, employee, shifts);
+      const flooredOT = Math.floor(rawOT); // 3.52→3, 0.82→0
+      if (flooredOT <= 0) return;          // skip if < 1 whole OT hour
 
+      let dailyPayableHours = flooredOT;
+
+      // Apply global OT rules (threshold → payout remapping)
       if (config.otConfig?.enabled && config.otConfig.rules && config.otConfig.rules.length > 0) {
-        const otMinutes = record.overtimeHours * 60;
-        const applicableRules = config.otConfig.rules.filter(r =>
+        const otMinutes = flooredOT * 60;
+        const applicableRules = config.otConfig.rules.filter((r: any) =>
           r.enabled && (r.department === 'All Departments' || r.department === employee.department)
         );
-        const sortedRules = applicableRules.sort((a, b) => b.thresholdMinutes - a.thresholdMinutes);
-        const matchedRule = sortedRules.find(r => otMinutes >= r.thresholdMinutes);
+        const sortedRules = applicableRules.sort((a: any, b: any) => b.thresholdMinutes - a.thresholdMinutes);
+        const matchedRule = sortedRules.find((r: any) => otMinutes >= r.thresholdMinutes);
         if (matchedRule) dailyPayableHours = matchedRule.payoutAmount;
       }
 
       effectiveTotalPayableOT += dailyPayableHours;
 
-      if (config.foodingConfig && config.foodingConfig.enabled) {
+      // Fooding: NOT on Sundays, only on working days with enough OT hours
+      const isSunday = new Date(record.date).getDay() === 0;
+      if (!isSunday && config.foodingConfig && config.foodingConfig.enabled) {
         const deptRule = config.foodingConfig.departmentOverrides?.[employee.department];
         const effectiveMinHours = deptRule ? deptRule.minHours : config.foodingConfig.minHours;
         const effectiveAmount   = deptRule ? deptRule.amount   : config.foodingConfig.amount;
-        if (record.overtimeHours >= effectiveMinHours) foodingAllowance += effectiveAmount;
+        if (flooredOT >= effectiveMinHours) foodingAllowance += effectiveAmount;
       }
     });
 
-    overtimePay = effectiveTotalPayableOT * hourlyRate * multiplier;
+    overtimePay = effectiveTotalPayableOT * (isNaN(hourlyRate) ? 0 : hourlyRate) * multiplier;
   }
 
   let totalLateHours  = 0;
@@ -229,70 +295,4 @@ export function calculateMonthlyPayroll(
         const cDate = new Date(c.date);
         return c.employeeId === employee.id &&
                c.status === 'Approved' &&
-               cDate.toLocaleString('default', { month: 'long' }) === month &&
-               cDate.getFullYear() === year;
-      })
-      .reduce((sum, c) => sum + c.amount, 0);
-  }
-
-  // ESIC only applies to employees with monthly salary ≤ ₹21,000 (statutory ceiling)
-  const ESIC_SALARY_CEILING = 21000;
-  const isEsicApplicable = monthlySal <= ESIC_SALARY_CEILING && monthlySal > 0;
-  const esicEmployeeShare = isEsicApplicable ? Math.round(grossSalary * ESIC_EMPLOYEE_RATE * 100) / 100 : 0;
-  const esicEmployerShare = isEsicApplicable ? Math.round(grossSalary * ESIC_EMPLOYER_RATE * 100) / 100 : 0;
-
-  let lwfEmployeeShare = 0;
-  let lwfEmployerShare = 0;
-  if (grossSalary > 0) {
-    lwfEmployeeShare = Math.round(Math.min(grossSalary * LWF_EMPLOYEE_RATE, LWF_EMPLOYEE_CAP) * 100) / 100;
-    lwfEmployerShare = Math.round(lwfEmployeeShare * 2 * 100) / 100;
-  }
-
-  const payrollDate = new Date(year, monthIndex, 1);
-  let totalLoanDeduction = 0;
-  loans.filter(l => l.employeeId === employee.id).forEach(loan => {
-    const loanDate        = new Date(loan.issueDate);
-    const loanStartPeriod = new Date(loanDate.getFullYear(), loanDate.getMonth(), 1);
-    const loanEndPeriod   = new Date(loanStartPeriod);
-    loanEndPeriod.setMonth(loanEndPeriod.getMonth() + loan.tenureMonths);
-    if (payrollDate >= loanStartPeriod && payrollDate < loanEndPeriod)
-      totalLoanDeduction += loan.amount / loan.tenureMonths;
-  });
-  totalLoanDeduction = Math.round(totalLoanDeduction * 100) / 100;
-
-  const netPayable        = grossSalary + expenseReimbursement - lateDeduction - earlyDeduction - esicEmployeeShare - lwfEmployeeShare - totalLoanDeduction;
-  const roundedNetPayable = Math.round(netPayable * 100) / 100;
-
-  const effectiveServiceRate = employee.serviceChargeRate !== undefined ? employee.serviceChargeRate : SERVICE_CHARGE_RATE;
-  // Service charge is a company billing fee on gross salary earned, not on employee take-home
-  const serviceCharge = Math.round(grossSalary * effectiveServiceRate * 100) / 100;
-
-  return {
-    employeeId: employee.id,
-    month,
-    year,
-    daysPresent,
-    daysAbsent,
-    holidays: totalPaidHolidays,
-    totalOvertimeHours,
-    totalLateMinutes,
-    basicSalary: roundedBasicSalary,
-    grossSalary,
-    overtimePay,
-    foodingAllowance,
-    expenseReimbursement,
-    esicEmployeeShare,
-    esicEmployerShare,
-    lwfEmployeeShare,
-    lwfEmployerShare,
-    serviceCharge,
-    loanDeduction: totalLoanDeduction,
-    lateDeduction,
-    earlyDeduction,
-    lateCount,
-    earlyCount,
-    lateHours: Math.round(totalLateHours * 100) / 100,
-    earlyHours: Math.round(totalEarlyHours * 100) / 100,
-    netPayable: roundedNetPayable
-  };
-}
+               cDate.t

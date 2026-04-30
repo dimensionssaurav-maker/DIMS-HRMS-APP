@@ -277,7 +277,7 @@ export default function App() {
   const [cachedInsights, setCachedInsights] = useState("");
 
   const payrollData = useMemo(() => employees.map(emp => 
-    calculateMonthlyPayroll(emp, attendanceRecords, loans, claims, holidays, selectedMonth, selectedYear, payrollConfig)
+    calculateMonthlyPayroll(emp, attendanceRecords, loans, claims, holidays, selectedMonth, selectedYear, payrollConfig, shifts)
   ), [employees, attendanceRecords, loans, claims, holidays, selectedMonth, selectedYear, payrollConfig]);
 
   const allExpenses = useMemo(() => {
