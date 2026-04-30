@@ -672,89 +672,8 @@ const SettingsModule: React.FC<Props> = ({ payrollConfig, onUpdatePayrollConfig,
                   <p className="text-xs text-slate-500">Global rules for salary calculations, overtime, and benefits.</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Global OT Multiplier */}
-                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                    <h4 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
-                      <Clock size={18} className="text-indigo-600" /> Overtime Multiplier
-                    </h4>
-                    <div className="space-y-4">
-                      {/* Pay Ratio — actual hours → pay hours */}
-                      <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">OT Pay Ratio</label>
-                        <p className="text-[11px] text-slate-400 mb-3">Set how many hours are paid for each actual OT hour worked.</p>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <div className="text-center">
-                            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Actual Hours</p>
-                            <input
-                              type="number" min="0.5" step="0.5"
-                              value={localPayrollConfig.otPayRatio?.actualHours ?? 1}
-                              onChange={(e) => {
-                                const actual = parseFloat(e.target.value) || 1;
-                                const pay = localPayrollConfig.otPayRatio?.payHours ?? 1.5;
-                                setLocalPayrollConfig({
-                                  ...localPayrollConfig,
-                                  otPayRatio: { actualHours: actual, payHours: pay },
-                                  globalOtMultiplier: Math.round((pay / actual) * 100) / 100
-                                });
-                              }}
-                              className="w-20 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-center"
-                            />
-                          </div>
-                          <span className="text-slate-400 font-bold text-lg mt-4">→</span>
-                          <div className="text-center">
-                            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Pay Hours</p>
-                            <input
-                              type="number" min="0.5" step="0.5"
-                              value={localPayrollConfig.otPayRatio?.payHours ?? 1.5}
-                              onChange={(e) => {
-                                const pay = parseFloat(e.target.value) || 1;
-                                const actual = localPayrollConfig.otPayRatio?.actualHours ?? 1;
-                                setLocalPayrollConfig({
-                                  ...localPayrollConfig,
-                                  otPayRatio: { actualHours: actual, payHours: pay },
-                                  globalOtMultiplier: Math.round((pay / actual) * 100) / 100
-                                });
-                              }}
-                              className="w-20 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-center"
-                            />
-                          </div>
-                          <div className="mt-4 bg-indigo-100 text-indigo-700 px-3 py-2 rounded-xl text-center">
-                            <p className="text-[9px] font-black uppercase">Multiplier</p>
-                            <p className="text-sm font-black">{localPayrollConfig.globalOtMultiplier ?? 1.5}×</p>
-                          </div>
-                        </div>
-                        <p className="text-[11px] text-indigo-600 font-semibold mt-3">
-                          e.g. Work {localPayrollConfig.otPayRatio?.actualHours ?? 1}h actual → get paid for {localPayrollConfig.otPayRatio?.payHours ?? 1.5}h
-                        </p>
-                      </div>
-
-                      {/* Manual override still available */}
-                      <div className="pt-3 border-t border-slate-200">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Or set Multiplier directly</label>
-                        <div className="flex items-center gap-3 mt-1">
-                          <input
-                            type="number" step="0.05"
-                            value={localPayrollConfig.globalOtMultiplier}
-                            onChange={(e) => {
-                              const mult = parseFloat(e.target.value) || 1;
-                              const actual = localPayrollConfig.otPayRatio?.actualHours ?? 1;
-                              setLocalPayrollConfig({
-                                ...localPayrollConfig,
-                                globalOtMultiplier: mult,
-                                otPayRatio: { actualHours: actual, payHours: Math.round(actual * mult * 100) / 100 }
-                              });
-                            }}
-                            className="w-24 px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                          />
-                          <span className="text-xs text-slate-400 font-medium">x Hourly Rate</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Fooding Config */}
-                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                {/* Fooding Config */}
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 max-w-sm">
                     <div className="flex justify-between items-center mb-4">
                       <h4 className="font-bold text-slate-700 flex items-center gap-2">
                         <IndianRupee size={18} className="text-indigo-600" /> Fooding Allowance
@@ -796,59 +715,6 @@ const SettingsModule: React.FC<Props> = ({ payrollConfig, onUpdatePayrollConfig,
                           />
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Designation Overrides */}
-                <div className="space-y-4">
-                  <h4 className="font-bold text-slate-700 flex items-center gap-2">
-                    <Building size={18} className="text-indigo-600" /> Designation Overrides
-                  </h4>
-                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                    <div className="flex gap-3 mb-6">
-                      <select 
-                        value={newDesignation}
-                        onChange={(e) => setNewDesignation(e.target.value)}
-                        className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold outline-none"
-                      >
-                        <option value="">Select Designation</option>
-                        {uniqueDesignations.map(d => (
-                          <option key={d} value={d}>{d}</option>
-                        ))}
-                      </select>
-                      <input 
-                        type="number" 
-                        step="0.1"
-                        placeholder="Multiplier"
-                        value={newMultiplier}
-                        onChange={(e) => setNewMultiplier(parseFloat(e.target.value))}
-                        className="w-32 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold outline-none"
-                      />
-                      <button 
-                        onClick={addDesignationOverride}
-                        disabled={!newDesignation}
-                        className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
-                      >
-                        Add
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {Object.entries(localPayrollConfig.designationOverrides).map(([designation, multiplier]) => (
-                        <div key={designation} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
-                          <div>
-                            <p className="text-xs font-bold text-slate-700">{designation}</p>
-                            <p className="text-[10px] text-indigo-600 font-bold">{multiplier}x Multiplier</p>
-                          </div>
-                          <button 
-                            onClick={() => removeDesignationOverride(designation)}
-                            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      ))}
                     </div>
                   </div>
                 </div>
