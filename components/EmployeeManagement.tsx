@@ -394,15 +394,9 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
             </div>
           )}
           
-          <button onClick={() => { setShowImportModal(true); setImportStep('input'); }} className="bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
-            <Users size={18} /> Bulk Import
-          </button>
-          <button onClick={() => { setShowFormsModal(true); fetchJoinForms(); }} className="bg-white border border-emerald-200 text-emerald-700 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-50 transition-all">
-            <FileText size={16} /> View Forms
-          </button>
-          <button onClick={() => setShowJoiningForm(true)} className="bg-white border border-indigo-200 text-indigo-600 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-50 transition-all">
-            <Upload size={16} /> Upload Joining Form
-          </button>
+
+
+
           <button onClick={onAdd} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
             <UserPlus size={18} /> Add Employee
           </button>
