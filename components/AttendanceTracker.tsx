@@ -67,66 +67,6 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
 
   const getMonthRecord = (empId: string, date: string) => records.find(r => r.employeeId === empId && r.date === date);
 
-  const getEmpMonthlySummary = (empId: string, days: string[]) => {
-    let present = 0, absent = 0, leave = 0, holiday = 0, late = 0, totalOT = 0, halfDays = 0;
-    const emp = employees.find(e => e.id === empId);
-    const joinDay = emp?.joiningDate
-      ? (() => { const d = new Date(emp.joiningDate); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); })()
-      : null;
-
-    const manualHolidayDates = new Set(
-      days.filter(date => {
-        const r = getMonthRecord(empId, date);
-        return r && r.status === ('HOLIDAY' as AttendanceStatus);
-      })
-    );
-
-    days.forEach(date => {
-      const r = getMonthRecord(empId, date);
-      const dateObj = new Date(date);
-      const isSun = dateObj.getDay() === 0;
-      const hol = holidays.find(h => h.date === date && h.type === 'Full');
-      const isBeforeJoining = joinDay ? dateObj < joinDay : false;
-
-      if (isBeforeJoining) return;
-
-      if (r) {
-        const v = String(r.status || '').toUpperCase();
-        const isHD = v === 'HD' || v === 'HALFDAY' || v === 'HALF' || v === 'P/H' || v === 'H/P';
-        if (isHD) halfDays++;
-        else if (r.status === 'PRESENT' as AttendanceStatus) present++;
-        else if (r.status === 'ABSENT' as AttendanceStatus) absent++;
-        else if (r.status === 'LEAVE' as AttendanceStatus) leave++;
-        else if (r.status === 'HOLIDAY' as AttendanceStatus) holiday++;
-        if (r.lateMinutes && r.lateMinutes > 0) late++;
-        totalOT += r.overtimeHours || 0;
-      } else {
-        const coveredByGlobalHoliday = hol && !manualHolidayDates.has(date);
-        const isSundayOff = isSun && !hol;
-        if (coveredByGlobalHoliday || isSundayOff) holiday++;
-      }
-    });
-    const daysPaid = present + (halfDays / 2) + holiday;
-    // Compute payable OT using factory slab rules
-    const emp2 = employees.find(e => e.id === empId);
-    const shift2 = shifts.find(s => s.id === emp2?.shiftId);
-    const factoryCfg2 = (payrollConfig as any)?.factoryOTConfig;
-    let deptSlabs: {requiredHours: number; bonusHours: number}[] | null = null;
-    if (factoryCfg2?.enabled && factoryCfg2.deptConfigs?.length > 0) {
-      const dCfg = factoryCfg2.deptConfigs.find((d: any) => d.enabled && (d.department === 'All Departments' || d.department === emp2?.department));
-      if (dCfg?.slabs?.length > 0) deptSlabs = dCfg.slabs;
-    }
-    let totalOTPayable = 0;
-    days.forEach(date => {
-      const r2 = getMonthRecord(empId, date);
-      if (!r2 || !r2.overtimeHours || r2.overtimeHours <= 0) return;
-      const floored = Math.floor(r2.overtimeHours * 2) / 2;
-      if (floored <= 0) return;
-      totalOTPayable += deptSlabs ? calcFactoryOTPayable(floored, deptSlabs) : floored;
-    });
-    return { present, absent, leave, holiday, late, totalOT, halfDays, daysPaid, totalOTPayable };
-  };
-
   const handleCellSave = () => {
     if (!editingCell) return;
     const emp = employees.find(e => e.id === editingCell.empId);
@@ -324,6 +264,74 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
     const checkOut = record?.checkOut || record?.punchOut || '';
     if (!checkIn || !checkOut || !employee.isOtAllowed) return 0;
     return calculateOT(checkIn, checkOut, employee, date);
+  };
+
+  // getEmpMonthlySummary MUST live after getEffectiveOT so it can call it.
+  // Using getEffectiveOT ensures OT is recalculated from punch times when
+  // overtimeHours is 0 in the stored record (common for biometric imports).
+  const getEmpMonthlySummary = (empId: string, days: string[]) => {
+    let present = 0, absent = 0, leave = 0, holiday = 0, late = 0, totalOT = 0, halfDays = 0;
+    const emp = employees.find(e => e.id === empId);
+    const joinDay = emp?.joiningDate
+      ? (() => { const d = new Date(emp.joiningDate); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); })()
+      : null;
+
+    const manualHolidayDates = new Set(
+      days.filter(date => {
+        const r = getMonthRecord(empId, date);
+        return r && r.status === ('HOLIDAY' as AttendanceStatus);
+      })
+    );
+
+    days.forEach(date => {
+      const r = getMonthRecord(empId, date);
+      const dateObj = new Date(date);
+      const isSun = dateObj.getDay() === 0;
+      const hol = holidays.find(h => h.date === date && h.type === 'Full');
+      const isBeforeJoining = joinDay ? dateObj < joinDay : false;
+
+      if (isBeforeJoining) return;
+
+      if (r) {
+        const v = String(r.status || '').toUpperCase();
+        const isHD = v === 'HD' || v === 'HALFDAY' || v === 'HALF' || v === 'P/H' || v === 'H/P';
+        if (isHD) halfDays++;
+        else if (r.status === 'PRESENT' as AttendanceStatus) present++;
+        else if (r.status === 'ABSENT' as AttendanceStatus) absent++;
+        else if (r.status === 'LEAVE' as AttendanceStatus) leave++;
+        else if (r.status === 'HOLIDAY' as AttendanceStatus) holiday++;
+        if (r.lateMinutes && r.lateMinutes > 0) late++;
+        // Use getEffectiveOT so punch-time OT is counted even when overtimeHours=0
+        totalOT += emp ? getEffectiveOT(r, emp, date) : (r.overtimeHours || 0);
+      } else {
+        const coveredByGlobalHoliday = hol && !manualHolidayDates.has(date);
+        const isSundayOff = isSun && !hol;
+        if (coveredByGlobalHoliday || isSundayOff) holiday++;
+      }
+    });
+
+    const daysPaid = present + (halfDays / 2) + holiday;
+
+    // Compute payable OT per day using factory slab rules
+    const factoryCfg2 = (payrollConfig as any)?.factoryOTConfig;
+    let deptSlabs: {requiredHours: number; bonusHours: number}[] | null = null;
+    if (factoryCfg2?.enabled && factoryCfg2.deptConfigs?.length > 0) {
+      const dCfg = factoryCfg2.deptConfigs.find((d: any) => d.enabled && (d.department === 'All Departments' || d.department === emp?.department));
+      if (dCfg?.slabs?.length > 0) deptSlabs = dCfg.slabs;
+    }
+    let totalOTPayable = 0;
+    days.forEach(date => {
+      const r2 = getMonthRecord(empId, date);
+      if (!r2) return;
+      // Use getEffectiveOT — covers both stored and punch-time-derived OT
+      const effectiveOT = emp ? getEffectiveOT(r2, emp, date) : (r2.overtimeHours || 0);
+      if (effectiveOT <= 0) return;
+      const floored = Math.floor(effectiveOT * 2) / 2;
+      if (floored <= 0) return;
+      totalOTPayable += deptSlabs ? calcFactoryOTPayable(floored, deptSlabs) : floored;
+    });
+
+    return { present, absent, leave, holiday, late, totalOT, halfDays, daysPaid, totalOTPayable };
   };
 
   const handleStatusChange = (empId: string, status: AttendanceStatus) => {
