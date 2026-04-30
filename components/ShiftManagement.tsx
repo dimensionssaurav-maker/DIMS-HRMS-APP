@@ -96,7 +96,7 @@ const OTSlabEditor: React.FC<OTSlabEditorProps> = ({ slabs, onChange }) => {
                 <Trash2 size={14}/>
               </button>
             </div>
-            <div className="grid grid-cols-4 gap-2 text-xs">
+            <div className="grid grid-cols-3 gap-2 text-xs">
               <div>
                 <label className="text-slate-400 font-semibold block mb-0.5">Start Time</label>
                 <input type="time" value={slab.startTime} onChange={e => update(idx, 'startTime', e.target.value)} className="w-full border border-slate-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-xs"/>
@@ -109,12 +109,7 @@ const OTSlabEditor: React.FC<OTSlabEditorProps> = ({ slabs, onChange }) => {
                 <label className="text-slate-400 font-semibold block mb-0.5">Multiplier (x)</label>
                 <input type="number" value={slab.multiplier} step="0.25" min="1" max="5" onChange={e => update(idx, 'multiplier', parseFloat(e.target.value))} className="w-full border border-slate-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-xs font-bold text-indigo-700"/>
               </div>
-              <div className="flex flex-col justify-end pb-1">
-                <label className="flex items-center gap-1 text-slate-400 font-semibold cursor-pointer text-[10px]">
-                  <input type="checkbox" checked={slab.crossesMidnight} onChange={e => update(idx, 'crossesMidnight', e.target.checked)} className="rounded"/>
-                  Crosses Midnight
-                </label>
-              </div>
+
             </div>
           </div>
         ))}
