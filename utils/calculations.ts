@@ -42,7 +42,7 @@ function recalcOTFromPunch(record: any, employee: any, shifts: Shift[]): number 
 
     if (sd.isFullDayOvertime) {
       // Sunday full-day OT: worked >= 7h -> pay 8h (or actual if > 8)
-      if (workedHours >= 7) return Math.max(8, workedHours);
+      if (workedHours >= 6.5) return 8; // worked >= 6.5h on Sunday -> 8h OT (no grace)
       return workedHours;
     }
     // Sunday with partial OT: OT = time after Sunday shift end
@@ -213,12 +213,13 @@ export function calculateMonthlyPayroll(
       const flooredOT = Math.floor(rawOT * 2) / 2; // 3.52->3.5, 6.12->6.0
       if (flooredOT <= 0) return;                   // skip if no OT
 
+      const isSundayRecord = new Date(record.date).getDay() === 0;
       let dailyPayableHours = flooredOT;
       let slabApplied = false;
 
-      // Factory OT slabs (highest priority — mirrors OvertimeModule logic)
+      // Factory OT slabs: Mon-Sat ONLY (Sundays use shift rule — 8h flat)
       const factoryCfg = (config as any).factoryOTConfig;
-      if (!slabApplied && factoryCfg?.enabled && factoryCfg.deptConfigs?.length > 0) {
+      if (!isSundayRecord && !slabApplied && factoryCfg?.enabled && factoryCfg.deptConfigs?.length > 0) {
         const deptCfg = factoryCfg.deptConfigs.find((d: any) =>
           d.enabled && (d.department === 'All Departments' || d.department === employee.department)
         );
@@ -228,8 +229,8 @@ export function calculateMonthlyPayroll(
         }
       }
 
-      // Basic OT config rules fallback (threshold -> payout remapping)
-      if (!slabApplied && config.otConfig?.enabled && config.otConfig.rules && config.otConfig.rules.length > 0) {
+      // Basic OT config rules fallback (threshold -> payout remapping, Mon-Sat only)
+      if (!isSundayRecord && !slabApplied && config.otConfig?.enabled && config.otConfig.rules && config.otConfig.rules.length > 0) {
         const otMinutes = flooredOT * 60;
         const applicableRules = config.otConfig.rules.filter((r: any) =>
           r.enabled && (r.department === 'All Departments' || r.department === employee.department)

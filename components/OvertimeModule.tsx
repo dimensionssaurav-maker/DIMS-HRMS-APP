@@ -78,7 +78,7 @@ function recalcOT(record: any, emp: Employee, shift: Shift | undefined): number 
     if (coM < ciM) coM += 1440;
     const worked = (coM - ciM) / 60;
     if (sd.isFullDayOvertime) {
-      const raw = worked >= 7 ? Math.max(8, worked) : worked;
+      const raw = worked >= 6.5 ? 8 : worked; // worked >= 6.5h on Sunday -> 8h OT (no grace)
       return Math.floor(raw * 2) / 2;
     }
     let cOut = coM; if (cOut < sunEnd - 600) cOut += 1440;
@@ -130,10 +130,11 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
         : (Number(emp.dailyWage) || 0);
       const hourlyRate = _dailyRate / 8;
       const multiplier = 1; // No OT multiplier — pay at flat hourly rate
+      const isSundayRec2 = new Date(r.date).getDay() === 0;
       let slabBreakdown: OTSlabResult[] = []; let otAmount = 0; let isTieredApplied = false; let payableHours = r.overtimeHours;
-      // ── Factory OT slabs (highest priority) ──
+      // ── Factory OT slabs: Mon-Sat ONLY (Sundays use shift rule — 8h flat) ──
       const factoryCfg = payrollConfig.factoryOTConfig;
-      if (factoryCfg?.enabled && factoryCfg.deptConfigs?.length > 0) {
+      if (!isSundayRec2 && factoryCfg?.enabled && factoryCfg.deptConfigs?.length > 0) {
         const deptCfg = factoryCfg.deptConfigs.find(d =>
           d.enabled && (d.department === 'All Departments' || d.department === emp.department)
         );
@@ -144,7 +145,7 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
         }
       }
 
-      if (!isTieredApplied && payrollConfig.otConfig?.enabled && payrollConfig.otConfig.rules?.length > 0) {
+      if (!isSundayRec2 && !isTieredApplied && payrollConfig.otConfig?.enabled && payrollConfig.otConfig.rules?.length > 0) {
         const otMins = r.overtimeHours * 60;
         const rules = payrollConfig.otConfig.rules.filter(rule => rule.enabled && (rule.department === 'All Departments' || rule.department === emp.department)).sort((a, b) => b.thresholdMinutes - a.thresholdMinutes);
         const matched = rules.find(rule => otMins >= rule.thresholdMinutes);
