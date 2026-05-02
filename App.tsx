@@ -18,6 +18,7 @@ import SettingsModule from './components/SettingsModule.tsx';
 import EmployeeOnboarding from './components/EmployeeOnboarding.tsx';
 import AIChatBot from './components/AIChatBot.tsx';
 import BiometricSync from './components/BiometricSync.tsx';
+import PieceRateContractors from './components/PieceRateContractors.tsx';
 
 import ESICReportSection from './components/ESICReportSection.tsx';
 import LWFReportSection from './components/LWFReportSection.tsx';
@@ -29,7 +30,7 @@ import EarlyLeaveReportSection from './components/EarlyLeaveReportSection.tsx';
 import LeftEmployeesReportSection from './components/LeftEmployeesReportSection.tsx';
 import ServiceChargeReportSection from './components/ServiceChargeReportSection.tsx';
 
-import { Employee, AttendanceRecord, Expense, ExpenseClaim, LeaveRequest, Shift, Loan, PayrollConfig, Holiday, SystemUser } from './types.ts';
+import { Employee, AttendanceRecord, Expense, ExpenseClaim, LeaveRequest, Shift, Loan, PayrollConfig, Holiday, SystemUser, ContractorPayment } from './types.ts';
 import { AttendanceStatus, ExpenseCategory } from './enums';
 import { calculateMonthlyPayroll } from './utils/calculations.ts';
 
@@ -50,7 +51,7 @@ const ReportsModule = ({ employees, payroll, expenses, loans, attendance, shifts
           { id: 'late', label: 'Late Arrivals' },
           { id: 'early', label: 'Early Leaving' },
           { id: 'leavers', label: 'Ex-Employees' },
-            { id: 'service', label: '₹ Service Charge' }
+            { id: 'service', label: '\u20B9 Service Charge' }
         ].map(type => (
           <button key={type.id} onClick={() => setReportType(type.id)}
             className={`px-4 py-2 rounded-xl text-sm font-bold uppercase whitespace-nowrap transition-all ${reportType === type.id ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-200'}`}>
@@ -83,6 +84,7 @@ export default function App() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [contractorPayments, setContractorPayments] = useState<ContractorPayment[]>([]);
   const [securityData, setSecurityData] = useState<{permissions: any[], securityConfig: any} | undefined>(undefined);
   const [users, setUsers] = useState<SystemUser[]>([
     { id: 'u1', name: 'Admin User',    email: 'admin@dims.com',    role: 'Admin',    status: 'Active', lastLogin: 'Never', isLocked: false, password: 'admin123' },
@@ -90,7 +92,6 @@ export default function App() {
     { id: 'u3', name: 'Factory Manager', email: 'manager@dims.com', role: 'Manager', status: 'Active', lastLogin: 'Never', isLocked: false, password: 'manager123' },
     { id: 'u4', name: 'Employee',      email: 'emp@dims.com',      role: 'Employee', status: 'Active', lastLogin: 'Never', isLocked: false, password: 'emp123' },
   ]);
-  // Persist login across refresh using sessionStorage
   const [showResetTool, setShowResetTool] = useState(false);
   const [currentUser, setCurrentUser] = useState<SystemUser | null>(() => {
     try {
@@ -117,11 +118,10 @@ export default function App() {
     recruitmentConfig: { sources: ['LinkedIn', 'Referral', 'Agency'], serviceChargeRates: [0.0833, 0.10] }
   });
 
-  // Load ALL collections from Firebase ONCE on mount
   useEffect(() => {
     const loadAll = async () => {
       try {
-        const [emps, att, leavs, shfts, lns, clms, settingsDocs, usersDocs, deptDocs, holDocs, secDocs] = await Promise.all([
+        const [emps, att, leavs, shfts, lns, clms, settingsDocs, usersDocs, deptDocs, holDocs, secDocs, contractorDocs] = await Promise.all([
           getData("employees"),
           getData("attendance"),
           getData("leaves"),
@@ -133,13 +133,11 @@ export default function App() {
           getData("departments"),
           getData("holidays"),
           getData("security"),
+          getData("contractorPayments"),
         ]);
         const empList: Employee[] = Array.isArray(emps) ? emps as Employee[] : [];
         const attList: any[] = Array.isArray(att) ? att : [];
 
-        // ── Auto-create employees from biometric attendance data ──────────────
-        // If biometric sync added attendance records with empCode/empName,
-        // auto-generate Employee records so the attendance tab can display them.
         if (attList.length > 0) {
           const existingCodes = new Set(empList.map(e => e.employeeCode || e.id));
           const newEmpsMap: Record<string, Employee> = {};
@@ -174,7 +172,6 @@ export default function App() {
           }
           const autoEmps = Object.values(newEmpsMap);
           if (autoEmps.length > 0) {
-            // Save auto-created employees to Firebase so they persist
             for (const emp of autoEmps) {
               try { await addData('employees', emp); } catch {}
             }
@@ -182,42 +179,33 @@ export default function App() {
           }
         }
 
-        // ── Build empCode → Firebase ID lookup map ───────────────────────────
-        // Employees have random Firebase IDs. Biometric records use empCode.
-        // We match them by employeeCode field.
         const empCodeToId: Record<string, string> = {};
         empList.forEach(emp => {
           const code = emp.employeeCode || emp.id;
           empCodeToId[code] = emp.id;
         });
 
-        // ── Fix attendance: map empCode → correct employeeId + normalize status ──
-        // Use string literals to avoid enum TDZ issue in minified Vite build
-        // AttendanceStatus enum values: PRESENT, ABSENT, HOLIDAY, LEAVE
         const normalizeStatus = (s: string): AttendanceStatus => {
           const v = String(s || '').toUpperCase().trim();
           if (v === 'P' || v.startsWith('P/') || v === 'PRESENT') return 'PRESENT' as AttendanceStatus;
           if (v === 'A' || v === 'ABSENT')                         return 'ABSENT'  as AttendanceStatus;
           if (v === 'H' || v === 'WO' || v === 'HOLIDAY')          return 'HOLIDAY' as AttendanceStatus;
           if (v === 'L' || v === 'LEAVE')                          return 'LEAVE'   as AttendanceStatus;
-          return 'PRESENT' as AttendanceStatus; // default
+          return 'PRESENT' as AttendanceStatus;
         };
 
-        // Deduplicate attendance on load: keep only the LATEST record per employeeId+date
-        // (duplicates were created by the old always-addData bug)
         const rawAtt: any[] = attList.map((rec: any) => {
           const empCode    = rec.empCode || rec.employeeCode || rec.employeeId || '';
           const employeeId = empCodeToId[empCode] || empCode;
           return {
             ...rec,
             employeeId,
-            docId:    rec.id,   // preserve Firestore doc ID for future upserts
+            docId:    rec.id,
             checkIn:  rec.checkIn  || rec.punchIn  || '',
             checkOut: rec.checkOut || rec.punchOut || '',
             status:   normalizeStatus(rec.status),
           };
         });
-        // Deduplicate: keep last record per employeeId+date (most recently added wins)
         const attMap = new Map<string, any>();
         for (const rec of rawAtt) {
           attMap.set(`${rec.employeeId}-${rec.date}`, rec);
@@ -231,20 +219,17 @@ export default function App() {
         setLoans(Array.isArray(lns) ? lns as Loan[] : []);
         setClaims(Array.isArray(clms) ? clms as ExpenseClaim[] : []);
 
-        // Load payroll config — cache firebase doc ID for future updates
         if (Array.isArray(settingsDocs) && settingsDocs.length > 0) {
-          const cfg = settingsDocs[0] as any; // single doc
+          const cfg = settingsDocs[0] as any;
           if (cfg) {
             const { id, ...rest } = cfg;
-            settingsDocId.current = id; // cache for upsert
+            settingsDocId.current = id;
             setPayrollConfig(prev => ({ ...prev, ...rest }));
           }
         }
-        // Load system users
         if (Array.isArray(usersDocs) && usersDocs.length > 0) {
           setUsers(usersDocs as SystemUser[]);
         }
-        // Load departments — cache firebase doc ID
         if (Array.isArray(deptDocs) && deptDocs.length > 0) {
           const d = deptDocs[0] as any;
           if (d) {
@@ -252,11 +237,12 @@ export default function App() {
             if (Array.isArray(d.list)) setDepartments(d.list);
           }
         }
-        // Load holidays
         if (Array.isArray(holDocs) && holDocs.length > 0) {
           setHolidays(holDocs as Holiday[]);
         }
-        // Load security permissions
+        if (Array.isArray(contractorDocs) && contractorDocs.length > 0) {
+          setContractorPayments(contractorDocs as ContractorPayment[]);
+        }
         if (Array.isArray(secDocs) && secDocs.length > 0) {
           const sec = secDocs[0] as any;
           securityDocId.current = sec.id;
@@ -288,15 +274,12 @@ export default function App() {
   }, [expenses, claims]);
 
   const appContext = {
-    // Lightweight summary numbers (kept for the conversational chat)
     attendanceSummary: attendanceRecords.length,
     payrollTotal: payrollData.reduce((sum, p) => sum + p.netPayable, 0),
     pendingClaims: claims.filter(c => c.status === 'Under Review').length,
     activeTab,
     selectedMonth,
     selectedYear,
-    // Full datasets passed for PDF report generation. Not serialized to Gemini —
-    // the chat helper truncates context to ~8KB so this won't blow up the prompt.
     employees,
     attendanceRecords,
     payrollData,
@@ -305,10 +288,8 @@ export default function App() {
     payrollConfig,
   };
 
-  // ── EMPLOYEE handlers ──────────────────────────────────────────────────
   const handleAddEmployee = async (emp: Employee) => {
     try {
-      // Duplicate check — same employee code or same name in active employees
       const empCode = (emp.employeeCode || emp.id || '').trim().toLowerCase();
       const empName = (emp.name || '').trim().toLowerCase();
       const activeEmps = employees.filter(e => e.status === 'Active' || !e.status);
@@ -319,11 +300,11 @@ export default function App() {
         (e.name || '').trim().toLowerCase() === empName
       );
       if (dupCode) {
-        alert(`⚠️ Duplicate Employee!\n\nAn employee with code "${emp.employeeCode || emp.id}" already exists: ${dupCode.name}\n\nPlease use a different employee code.`);
+        alert(`\u26A0\uFE0F Duplicate Employee!\n\nAn employee with code "${emp.employeeCode || emp.id}" already exists: ${dupCode.name}\n\nPlease use a different employee code.`);
         return;
       }
       if (dupName) {
-        const confirm = window.confirm(`⚠️ Possible Duplicate!\n\nAn employee named "${emp.name}" already exists (Code: ${dupName.employeeCode || dupName.id}).\n\nDo you still want to add this employee?`);
+        const confirm = window.confirm(`\u26A0\uFE0F Possible Duplicate!\n\nAn employee named "${emp.name}" already exists (Code: ${dupName.employeeCode || dupName.id}).\n\nDo you still want to add this employee?`);
         if (!confirm) return;
       }
       const empRef = await addData("employees", emp);
@@ -336,7 +317,6 @@ export default function App() {
     try {
       for (const emp of updatedEmps) {
         if (emp.id) {
-          // Sanitize: remove undefined fields before sending to Firebase
           const cleanEmp = Object.fromEntries(
             Object.entries(emp).filter(([_, v]) => v !== undefined)
           );
@@ -357,10 +337,8 @@ export default function App() {
     try {
       const savedEmps = await Promise.all(
         newEmps.map(async (emp) => {
-          // Preserve the CSV/biometric ID as employeeCode for display & attendance matching
           const empWithCode = { ...emp, employeeCode: emp.employeeCode || emp.id };
           const ref = await addData("employees", empWithCode);
-          // Firebase doc ID becomes the real id used for all updates/deletes
           return { ...empWithCode, id: ref.id };
         })
       );
@@ -368,11 +346,8 @@ export default function App() {
     } catch (e) { console.error("Bulk add employee error:", e); }
   };
 
-  // ── ATTENDANCE handlers ────────────────────────────────────────────────
   const handleAttendanceUpdate = async (record: AttendanceRecord) => {
     try {
-      // UPSERT: update existing Firestore doc if found, create new only if not exists.
-      // Always using addData() was creating duplicate records for the same employee+date.
       const existing = attendanceRecords.find(
         r => r.employeeId === record.employeeId && r.date === record.date
       );
@@ -392,7 +367,6 @@ export default function App() {
   };
   const handleAttendanceBulkUpdate = async (newRecords: AttendanceRecord[]) => {
     try {
-      // UPSERT each record: update if exists, create if new
       for (const r of newRecords) {
         const existing = attendanceRecords.find(
           ex => ex.employeeId === r.employeeId && ex.date === r.date
@@ -410,7 +384,6 @@ export default function App() {
     } catch (e) { console.error("Bulk attendance error:", e); }
   };
 
-  // ── LEAVE handlers ─────────────────────────────────────────────────────
   const handleAddLeave = async (req: LeaveRequest) => {
     try {
       const leaveRef = await addData("leaves", req);
@@ -424,7 +397,6 @@ export default function App() {
     } catch (e) { console.error("Update leave error:", e); }
   };
 
-  // ── SHIFT handlers ─────────────────────────────────────────────────────
   const handleAddShift = async (s: Shift) => {
     try {
       const shiftRef = await addData("shifts", s);
@@ -444,7 +416,6 @@ export default function App() {
     } catch (e) { console.error("Delete shift error:", e); }
   };
 
-  // ── EXPENSE / CLAIM handlers ───────────────────────────────────────────
   const handleAddClaim = async (c: ExpenseClaim) => {
     try {
       const claimRef = await addData("claims", c);
@@ -458,7 +429,6 @@ export default function App() {
     } catch (e) { console.error("Update claim error:", e); }
   };
 
-  // ── LOAN handlers ──────────────────────────────────────────────────────
   const handleAddLoan = async (l: Loan) => {
     try {
       const loanRef = await addData("loans", l);
@@ -478,33 +448,40 @@ export default function App() {
     } catch (e) { console.error("Delete loan error:", e); }
   };
 
-  // ── Settings Save Handlers ───────────────────────────────────────────
-  // In-memory cache of Firebase doc IDs for singleton docs
+  const handleAddContractorPayment = async (p: ContractorPayment) => {
+    try {
+      const docRef = await addData("contractorPayments", p);
+      const saved = { ...p, id: docRef.id };
+      setContractorPayments(prev => [...prev, saved]);
+    } catch (e) { console.error("Add contractor payment error:", e); throw e; }
+  };
+  const handleDeleteContractorPayment = async (id: string) => {
+    try {
+      await deleteData("contractorPayments", id);
+      setContractorPayments(prev => prev.filter(p => p.id !== id));
+    } catch (e) { console.error("Delete contractor payment error:", e); throw e; }
+  };
+
   const settingsDocId = React.useRef<string | null>(null);
   const deptsDocId = React.useRef<string | null>(null);
   const securityDocId = React.useRef<string | null>(null);
 
-  // ── Helper: upsert a singleton document (always safe) ────────────────
   const upsertSingleton = async (collection: string, data: object, docIdRef: React.MutableRefObject<string | null>) => {
     try {
-      // If we have a cached ID, try to update directly
       if (docIdRef.current) {
         await updateData(collection, docIdRef.current, data);
         return;
       }
-      // No cached ID — fetch from Firebase to find existing doc
       const existing = await getData(collection);
       if (Array.isArray(existing) && existing.length > 0) {
         const docId = (existing[0] as any).id;
         docIdRef.current = docId;
         await updateData(collection, docId, data);
       } else {
-        // Truly doesn't exist yet — create it
         const ref = await addData(collection, data);
         docIdRef.current = ref.id;
       }
     } catch (e) {
-      // Update failed (doc doesn't exist) — create fresh
       console.warn(`upsertSingleton: update failed for ${collection}, creating new doc`);
       const ref = await addData(collection, data);
       docIdRef.current = ref.id;
@@ -524,14 +501,12 @@ export default function App() {
       const savedUsers: SystemUser[] = [];
       for (const user of updatedUsers) {
         const clean = Object.fromEntries(Object.entries(user).filter(([_, v]) => v !== undefined));
-        // If id looks like a Firebase id (not our local u1, u2...) update directly
         const isFirebaseId = user.id && !user.id.match(/^u\d{1,4}$/);
         try {
           if (isFirebaseId) {
             await updateData("systemUsers", user.id, clean);
             savedUsers.push(user);
           } else {
-            // Local id — check Firebase by email first
             const existing = await getData("systemUsers");
             const found = Array.isArray(existing) ? existing.find((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase()) : null;
             if (found) {
@@ -579,7 +554,6 @@ export default function App() {
     } catch (e) { console.error("Save security error:", e); }
   };
 
-  // ── Role-based module access ──────────────────────────────────────────
   const ROLE_TABS: Record<string, string[]> = {
     Admin:    ['dashboard','employees','attendance','biometric','leaves','shifts','payroll','expenses','overtime','loans','statutory','reports','settings'],
     HR:       ['dashboard','employees','attendance','biometric','leaves','shifts','payroll','expenses','loans','reports'],
@@ -588,7 +562,6 @@ export default function App() {
   };
   const allowedTabs = currentUser ? (ROLE_TABS[currentUser.role] || []) : [];
 
-  // ── Render ─────────────────────────────────────────────────────────────
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -634,18 +607,15 @@ export default function App() {
                   return h * 60 + m;
                 };
                 records.forEach(rec => {
-                  // Match employee
                   const emp = employees.find(e =>
                     e.id === rec.employeeId ||
                     (e.employeeCode || e.id || '').toLowerCase() === (rec.empCode || '').toLowerCase()
                   );
                   const shift = emp?.shiftId ? shifts.find(s => s.id === emp.shiftId) : undefined;
 
-                  // Normalise punch fields → checkIn / checkOut
                   const checkIn = rec.punchIn || rec.checkIn || '';
                   const checkOut = rec.punchOut || rec.checkOut || '';
 
-                  // Late minutes
                   let lateMinutes = 0;
                   if (checkIn && shift) {
                     const grace = shift.gracePeriodMinutes ?? 15;
@@ -656,7 +626,6 @@ export default function App() {
                     }
                   }
 
-                  // OT = time worked after shift end
                   let overtimeHours = 0;
                   if (checkIn && checkOut && emp?.isOtAllowed && shift) {
                     const dayOfWeek = new Date(rec.date).getDay();
@@ -676,7 +645,6 @@ export default function App() {
                         : shift.endTime;
                       let coMins = toMins(checkOut);
                       const seMins = toMins(shiftEndStr);
-                      // Handle midnight crossing
                       if (coMins < seMins - 600) coMins += 1440;
                       const otMins = coMins - seMins;
                       if (otMins > 0) {
@@ -734,6 +702,19 @@ export default function App() {
         return (
           <LoanManagement loans={loans} employees={employees} onAdd={handleAddLoan} onUpdate={handleUpdateLoan} onDelete={handleDeleteLoan} />
         );
+      case 'contractors':
+        return (
+          <PieceRateContractors
+            payments={contractorPayments}
+            month={selectedMonth}
+            year={selectedYear}
+            payrollConfig={payrollConfig}
+            onMonthChange={setSelectedMonth}
+            onYearChange={setSelectedYear}
+            onAdd={handleAddContractorPayment}
+            onDelete={handleDeleteContractorPayment}
+          />
+        );
       case 'statutory':
         return (
           <div className="space-y-8">
@@ -757,7 +738,6 @@ export default function App() {
     }
   };
 
-  // Show login screen if not authenticated
   if (!currentUser) {
     return (
       <LoginScreen
