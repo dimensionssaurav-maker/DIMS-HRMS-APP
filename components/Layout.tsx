@@ -100,6 +100,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, allo
     { id: 'payroll', label: 'Payroll', icon: IndianRupee },
     { id: 'statutory', label: 'Statutory (ESIC/LWF)', icon: Landmark },
     { id: 'loans', label: 'Loans & Advances', icon: Banknote },
+    { id: 'contractors', label: 'Contractor Payments', icon: Briefcase },
     { id: 'expenses', label: 'Expenses', icon: ReceiptIndianRupee },
     { id: 'reports', label: 'Reports', icon: FileBarChart },
     { id: 'settings', label: 'Settings', icon: Settings },
