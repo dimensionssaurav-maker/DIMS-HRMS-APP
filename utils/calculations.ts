@@ -42,7 +42,7 @@ function recalcOTFromPunch(record: any, employee: any, shifts: Shift[]): number 
 
     if (sd.isFullDayOvertime) {
       // Sunday full-day OT: worked >= 7h -> pay 8h (or actual if > 8)
-      if (workedHours >= 6.5) return 8; // worked >= 6.5h on Sunday -> 8h OT (no grace)
+      if (workedHours >= 7) return Math.max(8, workedHours);
       return workedHours;
     }
     // Sunday with partial OT: OT = time after Sunday shift end
@@ -61,30 +61,6 @@ function recalcOTFromPunch(record: any, employee: any, shifts: Shift[]): number 
 }
 
 // -- Status normalizer helpers (module-level to avoid TDZ in minified build) --
-
-// Mirror of OvertimeModule's factory OT slab calculation
-function calculateFactoryOTHours(actualOTHours: number, slabs: {requiredHours: number; bonusHours: number}[]): number {
-  if (!slabs || slabs.length === 0) return actualOTHours;
-  const slab1 = slabs[0];
-  if (actualOTHours < slab1.requiredHours) return 0;
-  let payableHours = slab1.requiredHours + slab1.bonusHours;
-  let remaining = actualOTHours - slab1.requiredHours;
-  for (let i = 1; i < slabs.length; i++) {
-    const slab = slabs[i];
-    if (remaining <= 0) break;
-    if (remaining >= slab.requiredHours) {
-      payableHours += slab.requiredHours + slab.bonusHours;
-      remaining -= slab.requiredHours;
-    } else {
-      payableHours += remaining;
-      remaining = 0;
-      break;
-    }
-  }
-  if (remaining > 0) payableHours += remaining;
-  return Math.round(payableHours * 100) / 100;
-}
-
 function isPresentStatus(s: string): boolean {
   const v = String(s || '').toUpperCase();
   return v === 'PRESENT' || v === 'P' || v.startsWith('P/');
@@ -148,9 +124,15 @@ export function calculateMonthlyPayroll(
     allMonthDays.push(`${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
   }
 
+  // ── Only look at records that fall inside the selected month ─────────────
+  // empAttendance contains ALL months; using it unfiltered caused OT/fooding
+  // from previous months to bleed into the current month's payroll.
+  const monthDaySet = new Set(allMonthDays);
+  const monthAttendance = empAttendance.filter(r => monthDaySet.has(r.date));
+
   // Track manual HOLIDAY records to avoid double-counting auto-holidays
   const manualHolidayDates = new Set(
-    allMonthDays.filter(date => empAttendance.some(r => r.date === date && isHolidayStatus(r.status)))
+    allMonthDays.filter(date => monthAttendance.some(r => r.date === date && isHolidayStatus(r.status)))
   );
 
   // Count exactly as AttendanceTracker.getEmpMonthlySummary does
@@ -160,7 +142,7 @@ export function calculateMonthlyPayroll(
   let totalPaidHolidays = 0;
 
   allMonthDays.forEach(date => {
-    const r = empAttendance.find(a => a.date === date);
+    const r = monthAttendance.find(a => a.date === date);
     const dateObj = new Date(date);
     const isSun = dateObj.getDay() === 0;
     const hol = holidays.find(h => h.date === date && h.type === 'Full');
@@ -179,8 +161,13 @@ export function calculateMonthlyPayroll(
     }
   });
 
-  let totalOvertimeHours = 0; // set after payable OT is computed (reflects slab rules)
-  const totalLateMinutes = empAttendance.reduce((acc, curr) => acc + (Number(curr.lateMinutes) || 0), 0);
+  // OT: recalculate from punch times if stored value is 0, then floor to nearest 0.5h
+  // Use monthAttendance (not empAttendance) so only this month's records count.
+  const totalOvertimeHours = monthAttendance.reduce((acc, curr) => {
+    const raw = recalcOTFromPunch(curr, employee, shifts);
+    return acc + Math.floor(raw * 2) / 2; // floor to 0.5h: 3.52->3.5, 6.12->6.0
+  }, 0);
+  const totalLateMinutes = monthAttendance.reduce((acc, curr) => acc + (Number(curr.lateMinutes) || 0), 0);
 
   const monthlySal = Number(employee.monthlySalary || (employee as any).salary || 0) || 0;
   const dailyWage  = Number(employee.dailyWage || 0) || 0;
@@ -204,33 +191,20 @@ export function calculateMonthlyPayroll(
 
   if (employee.isOtAllowed) {
     // Guard multiplier against undefined/NaN -> default to 1 (1x pay)
-    const multiplier = 1; // No OT multiplier — pay at flat hourly rate
+    const rawMultiplier = config.designationOverrides?.[employee.designation] ?? config.globalOtMultiplier;
+    const multiplier = (rawMultiplier != null && !isNaN(Number(rawMultiplier))) ? Number(rawMultiplier) : 1;
     let effectiveTotalPayableOT = 0;
 
-    empAttendance.forEach(record => {
+    monthAttendance.forEach(record => {
       // Recalculate OT from punch times; floor to nearest 0.5h
       const rawOT = recalcOTFromPunch(record, employee, shifts);
       const flooredOT = Math.floor(rawOT * 2) / 2; // 3.52->3.5, 6.12->6.0
       if (flooredOT <= 0) return;                   // skip if no OT
 
-      const isSundayRecord = new Date(record.date).getDay() === 0;
       let dailyPayableHours = flooredOT;
-      let slabApplied = false;
 
-      // Factory OT slabs: Mon-Sat ONLY (Sundays use shift rule — 8h flat)
-      const factoryCfg = (config as any).factoryOTConfig;
-      if (!isSundayRecord && !slabApplied && factoryCfg?.enabled && factoryCfg.deptConfigs?.length > 0) {
-        const deptCfg = factoryCfg.deptConfigs.find((d: any) =>
-          d.enabled && (d.department === 'All Departments' || d.department === employee.department)
-        );
-        if (deptCfg && deptCfg.slabs?.length > 0) {
-          dailyPayableHours = calculateFactoryOTHours(flooredOT, deptCfg.slabs);
-          slabApplied = true;
-        }
-      }
-
-      // Basic OT config rules fallback (threshold -> payout remapping, Mon-Sat only)
-      if (!isSundayRecord && !slabApplied && config.otConfig?.enabled && config.otConfig.rules && config.otConfig.rules.length > 0) {
+      // Apply global OT rules (threshold -> payout remapping)
+      if (config.otConfig?.enabled && config.otConfig.rules && config.otConfig.rules.length > 0) {
         const otMinutes = flooredOT * 60;
         const applicableRules = config.otConfig.rules.filter((r: any) =>
           r.enabled && (r.department === 'All Departments' || r.department === employee.department)
@@ -253,7 +227,6 @@ export function calculateMonthlyPayroll(
     });
 
     overtimePay = effectiveTotalPayableOT * (isNaN(hourlyRate) ? 0 : hourlyRate) * multiplier;
-    totalOvertimeHours = effectiveTotalPayableOT; // payable hours (after slab remapping)
   }
 
   let totalLateHours  = 0;
@@ -284,7 +257,7 @@ export function calculateMonthlyPayroll(
     );
   };
 
-  empAttendance.forEach(record => {
+  monthAttendance.forEach(record => {
     if (record.lateMinutes && record.lateMinutes > 0) {
       if (config.attendanceConfig?.lateRules) {
         const rule = findApplicableRule(record.lateMinutes, config.attendanceConfig.lateRules);
