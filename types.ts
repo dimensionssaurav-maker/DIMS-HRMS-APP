@@ -20,18 +20,6 @@ export interface DeductionRule {
   enabled: boolean;
 }
 
-export interface FactoryOTSlab {
-  id: string;
-  requiredHours: number;  // hours employee must actually complete for this slab
-  bonusHours: number;     // extra hours paid on top when slab is completed
-}
-
-export interface FactoryOTDeptConfig {
-  department: string;     // 'All Departments' or specific dept name
-  enabled: boolean;
-  slabs: FactoryOTSlab[]; // up to 3 slabs
-}
-
 export interface OTRule {
   id: string;
   department: string; // 'All Departments' or specific
@@ -42,7 +30,6 @@ export interface OTRule {
 
 export interface PayrollConfig {
   globalOtMultiplier: number;
-  otPayRatio?: { actualHours: number; payHours: number };
   designationOverrides: Record<string, number>;
   foodingConfig: {
     enabled: boolean;
@@ -57,10 +44,6 @@ export interface PayrollConfig {
   otConfig?: {
     enabled: boolean;
     rules: OTRule[];
-  };
-  factoryOTConfig?: {
-    enabled: boolean;
-    deptConfigs: FactoryOTDeptConfig[];
   };
   recruitmentConfig?: {
     sources: string[];
@@ -90,7 +73,6 @@ export interface Employee {
   serviceChargeRate?: number;
   // Profile
   avatar?: string;
-  mobileNo?: string;
 }
 
 export interface SystemUser {
@@ -236,6 +218,24 @@ export interface LeaveRequest {
   reason: string;
   status: LeaveStatus;
   appliedOn: string;
+}
+
+export interface ContractorPayment {
+  id: string;
+  month: string;
+  year: number;
+  contractorName: string;
+  department: string;
+  source: string;         // from payrollConfig.recruitmentConfig.sources
+  grossAmount: number;
+  deduction: number;
+  amount: number;         // grossAmount - deduction
+  serviceChargeRate: number; // percentage, e.g. 2 or 5
+  serviceCharge: number;  // calculated: amount * serviceChargeRate / 100
+  netPayable: number;     // amount - serviceCharge
+  pdfUrl?: string;        // Firebase Storage download URL for signed copy
+  pdfName?: string;       // original filename
+  createdAt: string;      // ISO date string
 }
 
 export interface MonthlyReport {
