@@ -12,19 +12,19 @@ export { LeaveStatus } from './enums';
 
 export interface DeductionRule {
   id: string;
-  department?: string;      // Optional, defaults to 'All Departments'
-  thresholdMinutes: number; // Slab FROM: late/early more than this many minutes
-  maxMinutes?: number;      // Slab TO: late/early up to this many minutes (undefined = no upper limit)
-  deductionAmount: number;  // Deduction in salary-hours
-  exemptionsCount?: number; // Times exempted per month before deduction applies
+  department?: string;
+  thresholdMinutes: number;
+  maxMinutes?: number;
+  deductionAmount: number;
+  exemptionsCount?: number;
   enabled: boolean;
 }
 
 export interface OTRule {
   id: string;
-  department: string; // 'All Departments' or specific
-  thresholdMinutes: number; // If OT > this
-  payoutAmount: number;     // Pay this many hours
+  department: string;
+  thresholdMinutes: number;
+  payoutAmount: number;
   enabled: boolean;
 }
 
@@ -58,20 +58,15 @@ export interface Employee {
   department: string;
   joiningDate: string;
   isOtAllowed: boolean;
-  // Status
   status: 'Active' | 'Left' | 'Deleted';
   leavingDate?: string;
-  // Salary Config
   salaryType: 'Daily' | 'Monthly';
-  dailyWage: number; // Used if type is Daily
-  monthlySalary: number; // Used if type is Monthly
-  monthlyBase: number; // Calculated base for sorting/display
-  // Shift Config
+  dailyWage: number;
+  monthlySalary: number;
+  monthlyBase: number;
   shiftId?: string;
-  // Hiring Config
   source?: string;
   serviceChargeRate?: number;
-  // Profile
   avatar?: string;
 }
 
@@ -83,8 +78,8 @@ export interface SystemUser {
   status: 'Active' | 'Inactive';
   lastLogin: string;
   isLocked?: boolean;
-  password?: string; // hashed or plain for demo
-  employeeId?: string; // linked employee record (for Employee role)
+  password?: string;
+  employeeId?: string;
 }
 
 export interface Loan {
@@ -102,8 +97,8 @@ export interface AttendanceRecord {
   date: string;
   status: AttendanceStatus;
   overtimeHours: number;
-  checkIn?: string; // Format "HH:mm"
-  checkOut?: string; // Format "HH:mm"
+  checkIn?: string;
+  checkOut?: string;
   lateMinutes?: number;
   earlyMinutes?: number;
 }
@@ -113,7 +108,7 @@ export interface Holiday {
   date: string;
   name: string;
   type: 'Full' | 'Short';
-  shortDayEndTime?: string; // e.g. "16:00"
+  shortDayEndTime?: string;
 }
 
 export interface PayrollCalculation {
@@ -169,13 +164,13 @@ export interface ExpenseClaim {
 }
 
 
-// ─── OT Slab Types (tiered time-based OT) ────────────────────────────────────
+// ─── OT Slab Types (tiered time-based OT) ────────────────────────────────────────────
 export interface OTSlab {
   id: string;
   name: string;
-  startTime: string;       // "HH:mm" 24-hr
-  endTime: string;         // "HH:mm" 24-hr
-  multiplier: number;      // e.g. 1.5, 2.0, 2.5
+  startTime: string;
+  endTime: string;
+  multiplier: number;
   crossesMidnight: boolean;
   enabled: boolean;
 }
@@ -192,19 +187,19 @@ export interface Shift {
   id: string;
   name: string;
   site: string;
-  startTime: string; // Format "HH:mm"
-  endTime: string;   // Format "HH:mm"
+  startTime: string;
+  endTime: string;
   workingHours: number;
   gracePeriodMinutes: number;
   breakDurationMinutes: number;
   overtimeThresholdHours: number;
   isNightShift: boolean;
-  otSlabs?: OTSlab[];      // Time-based OT slabs for tiered pay
+  otSlabs?: OTSlab[];
   sundaySchedule?: {
-    enabled: boolean; // Is Sunday a working day?
+    enabled: boolean;
     startTime: string;
     endTime: string;
-    isFullDayOvertime: boolean; // If true, all work hours count as OT
+    isFullDayOvertime: boolean;
   };
 }
 
@@ -226,16 +221,27 @@ export interface ContractorPayment {
   year: number;
   contractorName: string;
   department: string;
-  source: string;         // from payrollConfig.recruitmentConfig.sources
+  source: string;
   grossAmount: number;
   deduction: number;
-  amount: number;         // grossAmount - deduction
-  serviceChargeRate: number; // percentage, e.g. 2 or 5
-  serviceCharge: number;  // calculated: amount * serviceChargeRate / 100
-  netPayable: number;     // amount - serviceCharge
-  pdfUrl?: string;        // Firebase Storage download URL for signed copy
-  pdfName?: string;       // original filename
-  createdAt: string;      // ISO date string
+  amount: number;
+  serviceChargeRate: number;
+  serviceCharge: number;
+  netPayable: number;
+  pdfUrl?: string;
+  pdfName?: string;
+  createdAt: string;
+}
+
+export interface ContractorAdvance {
+  id: string;
+  contractorName: string;   // matched by name to ContractorPayment
+  amount: number;           // original advance issued
+  pendingAmount: number;    // remaining to recover
+  issuedDate: string;       // "YYYY-MM-DD"
+  description?: string;
+  status: 'Pending' | 'Partial' | 'Recovered';
+  createdAt: string;
 }
 
 export interface MonthlyReport {
