@@ -30,7 +30,7 @@ import EarlyLeaveReportSection from './components/EarlyLeaveReportSection.tsx';
 import LeftEmployeesReportSection from './components/LeftEmployeesReportSection.tsx';
 import ServiceChargeReportSection from './components/ServiceChargeReportSection.tsx';
 
-import { Employee, AttendanceRecord, Expense, ExpenseClaim, LeaveRequest, Shift, Loan, PayrollConfig, Holiday, SystemUser, ContractorPayment } from './types.ts';
+import { Employee, AttendanceRecord, Expense, ExpenseClaim, LeaveRequest, Shift, Loan, PayrollConfig, Holiday, SystemUser, ContractorPayment, ContractorAdvance } from './types.ts';
 import { AttendanceStatus, ExpenseCategory } from './enums';
 import { calculateMonthlyPayroll } from './utils/calculations.ts';
 
@@ -85,6 +85,7 @@ export default function App() {
   const [departments, setDepartments] = useState<string[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [contractorPayments, setContractorPayments] = useState<ContractorPayment[]>([]);
+  const [contractorAdvances, setContractorAdvances] = useState<ContractorAdvance[]>([]);
   const [securityData, setSecurityData] = useState<{permissions: any[], securityConfig: any} | undefined>(undefined);
   const [users, setUsers] = useState<SystemUser[]>([
     { id: 'u1', name: 'Admin User',    email: 'admin@dims.com',    role: 'Admin',    status: 'Active', lastLogin: 'Never', isLocked: false, password: 'admin123' },
@@ -121,7 +122,7 @@ export default function App() {
   useEffect(() => {
     const loadAll = async () => {
       try {
-        const [emps, att, leavs, shfts, lns, clms, settingsDocs, usersDocs, deptDocs, holDocs, secDocs, contractorDocs] = await Promise.all([
+        const [emps, att, leavs, shfts, lns, clms, settingsDocs, usersDocs, deptDocs, holDocs, secDocs, contractorDocs, advanceDocs] = await Promise.all([
           getData("employees"),
           getData("attendance"),
           getData("leaves"),
@@ -134,6 +135,7 @@ export default function App() {
           getData("holidays"),
           getData("security"),
           getData("contractorPayments"),
+          getData("contractorAdvances"),
         ]);
         const empList: Employee[] = Array.isArray(emps) ? emps as Employee[] : [];
         const attList: any[] = Array.isArray(att) ? att : [];
@@ -242,6 +244,10 @@ export default function App() {
         }
         if (Array.isArray(contractorDocs) && contractorDocs.length > 0) {
           setContractorPayments(contractorDocs as ContractorPayment[]);
+        }
+        // Load contractor advances
+        if (Array.isArray(advanceDocs) && advanceDocs.length > 0) {
+          setContractorAdvances(advanceDocs as ContractorAdvance[]);
         }
         if (Array.isArray(secDocs) && secDocs.length > 0) {
           const sec = secDocs[0] as any;
@@ -706,6 +712,7 @@ export default function App() {
         return (
           <PieceRateContractors
             payments={contractorPayments}
+            advances={contractorAdvances}
             month={selectedMonth}
             year={selectedYear}
             payrollConfig={payrollConfig}
@@ -713,6 +720,9 @@ export default function App() {
             onYearChange={setSelectedYear}
             onAdd={handleAddContractorPayment}
             onDelete={handleDeleteContractorPayment}
+            onAddAdvance={handleAddContractorAdvance}
+            onUpdateAdvance={handleUpdateContractorAdvance}
+            onDeleteAdvance={handleDeleteContractorAdvance}
           />
         );
       case 'statutory':
