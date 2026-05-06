@@ -468,6 +468,25 @@ export default function App() {
     } catch (e) { console.error("Delete contractor payment error:", e); throw e; }
   };
 
+  const handleAddContractorAdvance = async (a: ContractorAdvance) => {
+    try {
+      const docRef = await addData("contractorAdvances", a);
+      setContractorAdvances(prev => [...prev, { ...a, id: docRef.id }]);
+    } catch (e) { console.error("Add contractor advance error:", e); throw e; }
+  };
+  const handleUpdateContractorAdvance = async (a: ContractorAdvance) => {
+    try {
+      if (a.id) await updateData("contractorAdvances", a.id, a);
+      setContractorAdvances(prev => prev.map(x => x.id === a.id ? a : x));
+    } catch (e) { console.error("Update contractor advance error:", e); throw e; }
+  };
+  const handleDeleteContractorAdvance = async (id: string) => {
+    try {
+      await deleteData("contractorAdvances", id);
+      setContractorAdvances(prev => prev.filter(a => a.id !== id));
+    } catch (e) { console.error("Delete contractor advance error:", e); throw e; }
+  };
+
   const settingsDocId = React.useRef<string | null>(null);
   const deptsDocId = React.useRef<string | null>(null);
   const securityDocId = React.useRef<string | null>(null);
