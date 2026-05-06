@@ -561,9 +561,9 @@ export default function App() {
   };
 
   const ROLE_TABS: Record<string, string[]> = {
-    Admin:    ['dashboard','employees','attendance','biometric','leaves','shifts','payroll','expenses','overtime','loans','statutory','reports','settings'],
-    HR:       ['dashboard','employees','attendance','biometric','leaves','shifts','payroll','expenses','loans','reports'],
-    Manager:  ['dashboard','employees','attendance','leaves','overtime','reports'],
+    Admin:    ['dashboard','employees','attendance','biometric','leaves','shifts','payroll','expenses','overtime','loans','statutory','contractors','reports','settings'],
+    HR:       ['dashboard','employees','attendance','biometric','leaves','shifts','payroll','expenses','loans','contractors','reports'],
+    Manager:  ['dashboard','employees','attendance','leaves','overtime','contractors','reports'],
     Employee: ['dashboard','attendance','leaves'],
   };
   const allowedTabs = currentUser ? (ROLE_TABS[currentUser.role] || []) : [];
