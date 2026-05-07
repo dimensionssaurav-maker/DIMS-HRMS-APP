@@ -313,7 +313,7 @@ export function calculateMonthlyPayroll(
   const ESIC_SALARY_CEILING = 21000;
   const isEsicApplicable = monthlySal > 0 && (monthlySal <= ESIC_SALARY_CEILING || employee.esicOverride === true);
   const esicBase = (isEsicApplicable && (employee as any).esicOverride && monthlySal > ESIC_SALARY_CEILING)
-    ? ESIC_SALARY_CEILING
+    ? Math.min(grossSalary, ESIC_SALARY_CEILING)
     : grossSalary;
   const esicEmployeeShare = isEsicApplicable ? Math.round(esicBase * ESIC_EMPLOYEE_RATE * 100) / 100 : 0;
   const esicEmployerShare = isEsicApplicable ? Math.round(esicBase * ESIC_EMPLOYER_RATE * 100) / 100 : 0;
