@@ -68,6 +68,7 @@ export interface Employee {
   source?: string;
   serviceChargeRate?: number;
   avatar?: string;
+  esicOverride?: boolean;
 }
 
 export interface SystemUser {
