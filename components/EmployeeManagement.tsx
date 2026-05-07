@@ -769,6 +769,22 @@ const EmployeeManagement: React.FC<Props> = ({ employees, departments, shifts = 
                 </div>
               </div>
 
+              {/* ESIC Override */}
+              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold text-emerald-700 uppercase tracking-widest">ESIC Override</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Force ESIC even if salary &gt; ₹21,000</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setEditingEmployee({...editingEmployee, esicOverride: true})}
+                      className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${editingEmployee.esicOverride ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white border-slate-200 text-slate-500'}`}>Yes</button>
+                    <button type="button" onClick={() => setEditingEmployee({...editingEmployee, esicOverride: false})}
+                      className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${!editingEmployee.esicOverride ? 'bg-slate-200 text-slate-600 border-slate-200' : 'bg-white border-slate-200 text-slate-500'}`}>No</button>
+                  </div>
+                </div>
+              </div>
+
               {/* Shift */}
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><Clock size={12} /> Assigned Shift</label>
