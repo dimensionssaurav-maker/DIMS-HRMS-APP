@@ -311,7 +311,7 @@ export function calculateMonthlyPayroll(
 
   // ESIC only applies to employees with monthly salary <= 21,000 (statutory ceiling)
   const ESIC_SALARY_CEILING = 21000;
-  const isEsicApplicable = monthlySal <= ESIC_SALARY_CEILING && monthlySal > 0;
+  const isEsicApplicable = monthlySal > 0 && (monthlySal <= ESIC_SALARY_CEILING || employee.esicOverride === true);
   const esicEmployeeShare = isEsicApplicable ? Math.round(grossSalary * ESIC_EMPLOYEE_RATE * 100) / 100 : 0;
   const esicEmployerShare = isEsicApplicable ? Math.round(grossSalary * ESIC_EMPLOYER_RATE * 100) / 100 : 0;
 
