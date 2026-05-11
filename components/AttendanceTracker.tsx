@@ -933,7 +933,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                               ) : (
                                 <div className="py-1.5 px-0 relative">
                                   <span className={`text-xs ${labelColor}`}>{label}</span>
-                                  {r?.lateMinutes && r.lateMinutes > 0 && <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-orange-400"></div>}
+                                  {r && r.lateMinutes > 0 && <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-orange-400"></div>}
                                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Edit3 size={10} className="text-indigo-400" />
                                   </div>
@@ -1091,7 +1091,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                             const r = getMonthRecord(emp.id, date);
                             const isSun = new Date(date).getDay() === 0;
                             return (
-                              <td key={date} className={`px-1 py-1.5 text-center border-r border-slate-100 ${cellBorder} ${isSun ? 'bg-purple-50/40' : ''} ${r?.lateMinutes && r.lateMinutes > 0 ? 'bg-rose-50' : ''}`}>
+                              <td key={date} className={`px-1 py-1.5 text-center border-r border-slate-100 ${cellBorder} ${isSun ? 'bg-purple-50/40' : ''} ${r && r.lateMinutes > 0 ? 'bg-rose-50' : ''}`}>
                                 <span className="font-mono text-[10px] font-semibold text-slate-700">{r?.checkIn || '—'}</span>
                               </td>
                             );
