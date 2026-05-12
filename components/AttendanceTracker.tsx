@@ -257,13 +257,16 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
       return Math.round((otMinutes / 60) * 100) / 100;
   };
 
-  // Returns effective OT — stored value if > 0, else recalculated from punch times vs shift end
+  // Returns effective OT — always recalculates from punch times when available.
+  // Stored overtimeHours may be stale (e.g. from biometric sync with old thresholds).
   const getEffectiveOT = (record: any, employee: Employee, date: string): number => {
-    if ((record?.overtimeHours ?? 0) > 0) return record.overtimeHours;
+    if (!employee?.isOtAllowed) return 0;
     const checkIn = record?.checkIn || record?.punchIn || '';
     const checkOut = record?.checkOut || record?.punchOut || '';
-    if (!checkIn || !checkOut || !employee.isOtAllowed) return 0;
-    return calculateOT(checkIn, checkOut, employee, date);
+    // Always prefer punch-time recalculation when both times are available
+    if (checkIn && checkOut) return calculateOT(checkIn, checkOut, employee, date);
+    // Fall back to stored value only when no punch times exist
+    return record?.overtimeHours ?? 0;
   };
 
   // getEmpMonthlySummary MUST live after getEffectiveOT so it can call it.
