@@ -111,8 +111,9 @@ const OvertimeModule: React.FC<Props> = ({ employees, attendanceRecords, departm
     const recordsInPeriod = Array.from(deduped.values())
       .map(r => {
         const emp = employees.find(e => e.id === r.employeeId);
-        const shift = getShift(emp as Employee);
-        const ot = recalcOT(r, emp as Employee, shift);
+        if (!emp) return { ...r, overtimeHours: 0 };
+        const shift = getShift(emp);
+        const ot = recalcOT(r, emp, shift);
         return { ...r, overtimeHours: ot };
       })
       .filter(r => {
