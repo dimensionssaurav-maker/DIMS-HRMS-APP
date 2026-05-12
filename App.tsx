@@ -270,7 +270,7 @@ export default function App() {
 
   const payrollData = useMemo(() => employees.map(emp => 
     calculateMonthlyPayroll(emp, attendanceRecords, loans, claims, holidays, selectedMonth, selectedYear, payrollConfig, shifts)
-  ), [employees, attendanceRecords, loans, claims, holidays, selectedMonth, selectedYear, payrollConfig]);
+  ), [employees, attendanceRecords, loans, claims, holidays, selectedMonth, selectedYear, payrollConfig, shifts]);
 
   const allExpenses = useMemo(() => {
     const claimExpenses = claims
