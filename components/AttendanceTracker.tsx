@@ -717,7 +717,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                       <input type="time" value={record?.checkIn || ''} onChange={(e) => handleTimeChange(emp.id, 'checkIn', e.target.value)} disabled={isFullHoliday}
                         className={`border rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-300 w-26 text-center transition-all ${record?.lateMinutes && record.lateMinutes > 0 ? 'bg-rose-50 border-rose-300 text-rose-700' : 'bg-slate-50 border-slate-200'} ${isFullHoliday ? 'opacity-30 cursor-not-allowed' : 'hover:border-indigo-300'}`}
                       />
-                      {record?.lateMinutes && record.lateMinutes > 0 && (
+                      {(record?.lateMinutes ?? 0) > 0 && (
                         <div className="text-[9px] text-rose-500 font-bold mt-0.5">+{record.lateMinutes}m late</div>
                       )}
                     </td>
@@ -727,7 +727,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                       <input type="time" value={record?.checkOut || ''} onChange={(e) => handleTimeChange(emp.id, 'checkOut', e.target.value)} disabled={isFullHoliday}
                         className={`border rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-300 w-26 text-center transition-all ${record?.earlyMinutes && record.earlyMinutes > 0 ? 'bg-orange-50 border-orange-300 text-orange-700' : 'bg-slate-50 border-slate-200'} ${isFullHoliday ? 'opacity-30 cursor-not-allowed' : 'hover:border-indigo-300'}`}
                       />
-                      {record?.earlyMinutes && record.earlyMinutes > 0 && (
+                      {(record?.earlyMinutes ?? 0) > 0 && (
                         <div className="text-[9px] text-orange-500 font-bold mt-0.5">-{record.earlyMinutes}m early</div>
                       )}
                     </td>
@@ -946,10 +946,10 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                           );
                         })}
                         {/* Summary Cells */}
-                        <td className="px-2 py-2 text-center font-black text-emerald-700 bg-emerald-50/50 border-r border-slate-100">{summary.present}</td>
-                        <td className="px-2 py-2 text-center font-black text-red-600 bg-red-50/50 border-r border-slate-100">{summary.absent}</td>
-                        <td className="px-2 py-2 text-center font-black text-amber-600 bg-amber-50/50 border-r border-slate-100">{summary.leave}</td>
-                        <td className="px-2 py-2 text-center font-black text-purple-600 bg-purple-50/50 border-r border-slate-100">{summary.holiday}</td>
+                        <td className="px-2 py-2 text-center font-black text-emerald-700 bg-emerald-50/50 border-r border-slate-100">{summary.present > 0 ? summary.present : '—'}</td>
+                        <td className="px-2 py-2 text-center font-black text-red-600 bg-red-50/50 border-r border-slate-100">{summary.absent > 0 ? summary.absent : '—'}</td>
+                        <td className="px-2 py-2 text-center font-black text-amber-600 bg-amber-50/50 border-r border-slate-100">{summary.leave > 0 ? summary.leave : '—'}</td>
+                        <td className="px-2 py-2 text-center font-black text-purple-600 bg-purple-50/50 border-r border-slate-100">{summary.holiday > 0 ? summary.holiday : '—'}</td>
                         <td className="px-2 py-2 text-center font-black text-orange-600 bg-orange-50/50 border-r border-slate-100">{summary.totalOT > 0 ? summary.totalOT.toFixed(1) : '—'}</td>
                         <td className="px-2 py-2 text-center font-black text-rose-700 bg-rose-50/50 border-r border-slate-100">{summary.totalOTPayable > 0 ? summary.totalOTPayable.toFixed(1) : '—'}</td>
                         <td className="px-2 py-2 text-center font-black text-sky-600 bg-sky-50/50 border-r border-slate-100">{summary.halfDays > 0 ? summary.halfDays : '—'}</td>
