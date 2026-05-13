@@ -343,7 +343,7 @@ export function calculateMonthlyPayroll(
     daysPresent,
     daysAbsent,
     holidays: totalPaidHolidays,
-    totalOvertimeHours,
+    totalOvertimeHours: effectiveTotalPayableOT,
     totalLateMinutes,
     basicSalary: roundedBasicSalary,
     grossSalary,
