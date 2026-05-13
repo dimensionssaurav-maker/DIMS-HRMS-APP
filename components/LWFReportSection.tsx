@@ -27,6 +27,12 @@ const MONTHS_ORDER = [
 ];
 
 const LWFReportSection: React.FC<Props> = ({ payroll, employees, year, month, departmentFilter }) => {
+  // ── Currency formatter: rounds to 2 dp, fixes float precision ──
+  const fmt = (n: number): string => {
+    const v = Math.round((n || 0) * 100) / 100;
+    return v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
   const [viewType, setViewType] = useState<'yearly' | 'monthly'>('yearly');
   const [isExporting, setIsExporting] = useState<string | null>(null);
 
@@ -185,7 +191,7 @@ const LWFReportSection: React.FC<Props> = ({ payroll, employees, year, month, de
         <div className="space-y-4 lg:col-span-1">
            <div className="bg-cyan-600 p-5 rounded-2xl text-white shadow-lg shadow-cyan-100">
              <p className="text-xs font-bold text-cyan-200 uppercase tracking-widest mb-1">Total Fund Collected</p>
-             <p className="text-3xl font-black">₹{totals.total.toLocaleString()}</p>
+             <p className="text-3xl font-black">₹{fmt(totals.total)}</p>
              <p className="text-[10px] text-cyan-100 mt-2 opacity-80">
                 {viewType === 'yearly' ? 'YTD Collection' : `Collection for ${month}`}
              </p>
@@ -204,11 +210,11 @@ const LWFReportSection: React.FC<Props> = ({ payroll, employees, year, month, de
            <div className="grid grid-cols-2 gap-4">
              <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
                 <p className="text-[10px] font-bold text-slate-400 uppercase">Emp Share</p>
-                <p className="text-lg font-bold text-cyan-600">₹{totals.employee}</p>
+                <p className="text-lg font-bold text-cyan-600">₹{fmt(totals.employee)}</p>
              </div>
              <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
                 <p className="text-[10px] font-bold text-slate-400 uppercase">Emplr Share</p>
-                <p className="text-lg font-bold text-slate-700">₹{totals.employer}</p>
+                <p className="text-lg font-bold text-slate-700">₹{fmt(totals.employer)}</p>
              </div>
            </div>
         </div>
@@ -302,9 +308,9 @@ const LWFReportSection: React.FC<Props> = ({ payroll, employees, year, month, de
                                                 <div className="font-bold text-slate-700">{emp?.name}</div>
                                                 <div className="text-[10px] text-slate-400">{emp?.department}</div>
                                             </td>
-                                            <td className="px-6 py-3 text-center text-slate-600">₹{d.lwfEmployeeShare}</td>
-                                            <td className="px-6 py-3 text-center text-slate-600">₹{d.lwfEmployerShare}</td>
-                                            <td className="px-6 py-3 text-right font-bold text-cyan-600">₹{d.lwfEmployeeShare + d.lwfEmployerShare}</td>
+                                            <td className="px-6 py-3 text-center text-slate-600">₹{fmt(d.lwfEmployeeShare)}</td>
+                                            <td className="px-6 py-3 text-center text-slate-600">₹{fmt(d.lwfEmployerShare)}</td>
+                                            <td className="px-6 py-3 text-right font-bold text-cyan-600">₹{fmt(d.lwfEmployeeShare + d.lwfEmployerShare)}</td>
                                         </tr>
                                     );
                                 })}
