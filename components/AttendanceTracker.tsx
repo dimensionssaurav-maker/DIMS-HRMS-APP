@@ -1067,7 +1067,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                 employees.forEach(emp => {
                   const inRow = [emp.employeeCode || emp.id, emp.name, 'IN', ...monthDays.map(d => getMonthRecord(emp.id, d)?.checkIn || '')];
                   const outRow = ['','','OUT', ...monthDays.map(d => getMonthRecord(emp.id, d)?.checkOut || '')];
-                  const otRow = ['','','OT HOURS', ...monthDays.map(d => { const rec = getMonthRecord(emp.id, d); return String(rec ? getEffectiveOT(rec, emp, d) : 0); })];
+                  const otRow = ['','','OT HOURS', ...monthDays.map(d => { const rec = getMonthRecord(emp.id, d); return String(rec ? calcOTActual(rec, emp) : 0); })];
                   rows.push(inRow, outRow, otRow);
                 });
                 const dateHeader = ['EMP ID','NAME','', ...monthDays.map(d => d.slice(8)+'-'+d.slice(5,7))];
@@ -1157,7 +1157,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                           {monthDays.map(date => {
                             const r = getMonthRecord(emp.id, date);
                             const isSun = new Date(date).getDay() === 0;
-                            const ot = getEffectiveOT(r, emp, date);
+                            const ot = calcOTActual(r, emp);
                             return (
                               <td key={date} className={`px-1 py-1.5 text-center border-r border-slate-100 ${isSun ? 'bg-purple-50/40' : ''}`}>
                                 <span className={`font-mono text-[10px] font-bold ${ot > 0 ? 'text-amber-600' : 'text-slate-300'}`}>{ot > 0 ? ot : '0'}</span>
