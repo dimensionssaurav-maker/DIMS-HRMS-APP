@@ -306,9 +306,32 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
     const isSunday = new Date(r.date).getDay() === 0;
     const isFullDaySun = isSunday && shift?.sundaySchedule?.enabled && shift?.sundaySchedule?.isFullDayOvertime;
     if (isFullDaySun) return otActual;
+
+    // ── Factory OT Slab Rules (priority) ──────────────────────────────────
+    if (payrollConfig?.factoryOTConfig?.enabled) {
+      const deptConfigs = payrollConfig.factoryOTConfig.deptConfigs ?? [];
+      // Prefer dept-specific config, fall back to All Departments
+      const deptCfg = deptConfigs.find((d: any) => d.enabled && d.department === emp.department)
+                   ?? deptConfigs.find((d: any) => d.enabled && d.department === 'All Departments');
+      if (deptCfg) {
+        const slabs: any[] = deptCfg.slabs ?? [];
+        const slab1 = slabs[0]; // Slab 1 = minimum gate
+        if (!slab1 || otActual < slab1.requiredHours) return 0; // below gate → 0 OT
+        // Check slabs from highest requiredHours down; pay first matching
+        const sorted = [...slabs].sort((a, b) => b.requiredHours - a.requiredHours);
+        for (const slab of sorted) {
+          if (otActual >= slab.requiredHours) {
+            return Math.floor((slab.requiredHours + slab.bonusHours) * 2) / 2;
+          }
+        }
+        return otActual; // met gate, no higher slab matched
+      }
+    }
+
+    // ── Classic threshold → payout rules ──────────────────────────────────
     if (payrollConfig?.otConfig?.enabled && payrollConfig.otConfig.rules?.length > 0) {
       const otMins = otActual * 60;
-      const rules = payrollConfig.otConfig.rules.filter(rule =>
+      const rules = payrollConfig.otConfig.rules.filter((rule: any) =>
         rule.enabled && (rule.department === 'All Departments' || rule.department === emp.department)
       );
       for (const rule of rules) {
@@ -1157,7 +1180,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                           {monthDays.map(date => {
                             const r = getMonthRecord(emp.id, date);
                             const isSun = new Date(date).getDay() === 0;
-                            const ot = calcOTActual(r, emp);
+                            const ot = r ? calcOTActual(r, emp) : 0;
                             return (
                               <td key={date} className={`px-1 py-1.5 text-center border-r border-slate-100 ${isSun ? 'bg-purple-50/40' : ''}`}>
                                 <span className={`font-mono text-[10px] font-bold ${ot > 0 ? 'text-amber-600' : 'text-slate-300'}`}>{ot > 0 ? ot : '0'}</span>
