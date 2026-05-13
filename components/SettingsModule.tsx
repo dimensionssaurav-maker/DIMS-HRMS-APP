@@ -673,49 +673,88 @@ const SettingsModule: React.FC<Props> = ({ payrollConfig, onUpdatePayrollConfig,
                 </div>
 
                 {/* Fooding Config */}
-                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 max-w-sm">
-                    <div className="flex justify-between items-center mb-4">
-                      <h4 className="font-bold text-slate-700 flex items-center gap-2">
-                        <IndianRupee size={18} className="text-indigo-600" /> Fooding Allowance
-                      </h4>
-                      <button 
-                        onClick={() => setLocalPayrollConfig({
-                          ...localPayrollConfig, 
-                          foodingConfig: { ...localPayrollConfig.foodingConfig, enabled: !localPayrollConfig.foodingConfig.enabled }
-                        })}
-                        className={`p-1 rounded-full transition-all ${localPayrollConfig.foodingConfig.enabled ? 'text-indigo-600' : 'text-slate-300'}`}
-                      >
-                        {localPayrollConfig.foodingConfig.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
-                      </button>
-                    </div>
-                    <div className={`space-y-4 transition-opacity ${localPayrollConfig.foodingConfig.enabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-xs font-bold text-slate-500 uppercase">Min Hours</label>
-                          <input 
-                            type="number" 
-                            value={localPayrollConfig.foodingConfig.minHours}
-                            onChange={(e) => setLocalPayrollConfig({
-                              ...localPayrollConfig, 
-                              foodingConfig: { ...localPayrollConfig.foodingConfig, minHours: parseInt(e.target.value) }
-                            })}
-                            className="w-full px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none mt-1"
-                          />
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-slate-700 flex items-center gap-2">
+                      <IndianRupee size={18} className="text-indigo-600" /> Fooding Allowance
+                    </h4>
+                    <button
+                      onClick={() => setLocalPayrollConfig({ ...localPayrollConfig, foodingConfig: { ...localPayrollConfig.foodingConfig, enabled: !localPayrollConfig.foodingConfig.enabled } })}
+                      className={`p-1 rounded-full transition-all ${localPayrollConfig.foodingConfig.enabled ? 'text-indigo-600' : 'text-slate-300'}`}
+                    >
+                      {localPayrollConfig.foodingConfig.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                    </button>
+                  </div>
+
+                  {localPayrollConfig.foodingConfig.enabled && (
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 space-y-5">
+
+                      {/* Global default */}
+                      <div>
+                        <p className="text-xs font-bold text-indigo-700 uppercase mb-2">Global Default (All Departments)</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase">Min OT Hours</label>
+                            <input type="number" value={localPayrollConfig.foodingConfig.minHours}
+                              onChange={(e) => setLocalPayrollConfig({ ...localPayrollConfig, foodingConfig: { ...localPayrollConfig.foodingConfig, minHours: parseInt(e.target.value) } })}
+                              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none mt-1 bg-white" />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase">Amount (₹/day)</label>
+                            <input type="number" value={localPayrollConfig.foodingConfig.amount}
+                              onChange={(e) => setLocalPayrollConfig({ ...localPayrollConfig, foodingConfig: { ...localPayrollConfig.foodingConfig, amount: parseInt(e.target.value) } })}
+                              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none mt-1 bg-white" />
+                          </div>
                         </div>
-                        <div>
-                          <label className="text-xs font-bold text-slate-500 uppercase">Amount (₹)</label>
-                          <input 
-                            type="number" 
-                            value={localPayrollConfig.foodingConfig.amount}
-                            onChange={(e) => setLocalPayrollConfig({
-                              ...localPayrollConfig, 
-                              foodingConfig: { ...localPayrollConfig.foodingConfig, amount: parseInt(e.target.value) }
-                            })}
-                            className="w-full px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none mt-1"
-                          />
+                      </div>
+
+                      {/* Department overrides */}
+                      <div>
+                        <p className="text-xs font-bold text-indigo-700 uppercase mb-1">Department Overrides</p>
+                        <p className="text-xs text-indigo-600 mb-3">Set higher fooding for senior departments. Overrides global default.</p>
+
+                        {/* Existing overrides list */}
+                        {Object.keys(localPayrollConfig.foodingConfig.departmentOverrides || {}).length > 0 && (
+                          <div className="space-y-2 mb-3">
+                            {Object.entries(localPayrollConfig.foodingConfig.departmentOverrides || {}).map(([dept, rule]: [string, any]) => (
+                              <div key={dept} className="flex items-center justify-between bg-white rounded-xl border border-indigo-100 px-3 py-2">
+                                <div className="flex items-center gap-4">
+                                  <span className="text-xs font-black text-slate-700 w-28 truncate">{dept}</span>
+                                  <span className="text-xs text-slate-500">Min OT: <b>{rule.minHours}h</b></span>
+                                  <span className="text-xs font-bold text-emerald-700">₹{rule.amount}/day</span>
+                                </div>
+                                <button onClick={() => removeFoodingOverride(dept)} className="text-slate-300 hover:text-red-500 transition-all"><X size={14} /></button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Add new override row */}
+                        <div className="bg-white rounded-xl border border-indigo-100 p-3 space-y-2">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">Add Department Override</p>
+                          <div className="grid grid-cols-3 gap-2">
+                            <select value={newFoodingDept} onChange={(e) => setNewFoodingDept(e.target.value)}
+                              className="px-2 py-1.5 rounded-lg border border-slate-200 text-xs font-bold outline-none bg-white">
+                              <option value="">Select Dept</option>
+                              {departments.filter(d => d !== 'All Departments').map(d => (
+                                <option key={d} value={d}>{d}</option>
+                              ))}
+                            </select>
+                            <input type="number" placeholder="Min OT hrs" value={newFoodingMinHours}
+                              onChange={(e) => setNewFoodingMinHours(parseFloat(e.target.value) || 0)}
+                              className="px-2 py-1.5 rounded-lg border border-slate-200 text-xs font-bold outline-none text-center" />
+                            <input type="number" placeholder="₹ Amount" value={newFoodingAmount}
+                              onChange={(e) => setNewFoodingAmount(parseFloat(e.target.value) || 0)}
+                              className="px-2 py-1.5 rounded-lg border border-slate-200 text-xs font-bold outline-none text-center" />
+                          </div>
+                          <button onClick={addFoodingOverride}
+                            className="w-full bg-indigo-600 text-white text-xs font-bold py-1.5 rounded-lg hover:bg-indigo-700 transition-all flex items-center justify-center gap-1">
+                            <Plus size={12} /> Add Override
+                          </button>
                         </div>
                       </div>
                     </div>
+                  )}
                 </div>
 
                 {/* Factory OT Slab Config */}
