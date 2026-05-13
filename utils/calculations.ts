@@ -184,9 +184,8 @@ export function calculateMonthlyPayroll(
   let payableOT = totalOvertimeHours;
 
   if (employee.isOtAllowed) {
-    // Guard multiplier against undefined/NaN -> default to 1 (1x pay)
-    const rawMultiplier = config.designationOverrides?.[employee.designation] ?? config.globalOtMultiplier;
-    const multiplier = (rawMultiplier != null && !isNaN(Number(rawMultiplier))) ? Number(rawMultiplier) : 1;
+    // Multiplier fixed at 1 — OT paid at straight hourly rate (no premium)
+    const multiplier = 1;
     let effectiveTotalPayableOT = 0;
 
     monthAttendance.forEach(record => {
