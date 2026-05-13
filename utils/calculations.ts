@@ -149,8 +149,22 @@ export function calculateMonthlyPayroll(
       else if (isHolidayStatus(r.status)) totalPaidHolidays++;
     } else {
       const coveredByGlobalHoliday = hol && !manualHolidayDates.has(date);
-      const isSundayOff = isSun && !hol;
-      if (coveredByGlobalHoliday || isSundayOff) totalPaidHolidays++;
+      if (isSun && !hol) {
+        // Sunday week-off rule: paid only if employee was present ≥ 3 days (Mon–Sat) that week
+        const sunDate = new Date(date);
+        let weekPresent = 0;
+        for (let back = 1; back <= 6; back++) {
+          const wd = new Date(sunDate);
+          wd.setDate(sunDate.getDate() - back);
+          const wdStr = wd.toISOString().slice(0, 10);
+          const wr = empAttendance.find(a => a.date === wdStr);
+          if (wr && (isPresentStatus(wr.status) || isHalfDayStatus(wr.status))) weekPresent++;
+        }
+        if (weekPresent >= 3) totalPaidHolidays++;
+        // else: unpaid Sunday — absent from enough days this week
+      } else if (coveredByGlobalHoliday) {
+        totalPaidHolidays++;
+      }
     }
   });
 
