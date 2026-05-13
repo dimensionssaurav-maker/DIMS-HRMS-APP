@@ -784,7 +784,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                       {emp.isOtAllowed ? (
                         <div className="flex items-center justify-center gap-1">
                           <input type="number" min="0" max="12" step="0.5"
-                            value={getEffectiveOT(record, emp, currentDate)}
+                            value={record ? calcOTActual(record, emp) : 0}
                             onChange={(e) => handleOvertimeChange(emp.id, e.target.value)}
                             className="w-14 border border-indigo-200 bg-indigo-50 rounded-lg p-1 text-center text-xs font-bold text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-300"
                           />
