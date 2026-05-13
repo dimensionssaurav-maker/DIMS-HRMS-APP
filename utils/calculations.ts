@@ -40,16 +40,9 @@ function recalcOTFromPunch(record: any, employee: any, shifts: Shift[]): number 
     if (coMins < ciMins)   coMins += 1440;
     const workedHours = (coMins - ciMins) / 60;
 
-    if (sd.isFullDayOvertime) {
-      // Sunday full-day OT: worked >= 7h -> pay 8h (or actual if > 8)
-      if (workedHours >= 6.5) return Math.max(8, workedHours);
-      return workedHours;
-    }
-    // Sunday with partial OT: OT = time after Sunday shift end
-    let cOut = coMins;
-    if (cOut < sunEnd - 600) cOut += 1440;
-    const otM = cOut - sunEnd;
-    return otM > 0 ? otM / 60 : 0;
+    // Sunday full-day OT: mirrors OvertimeModule (no isFullDayOvertime gate)
+    if (workedHours >= 6.5) return Math.max(8, workedHours);
+    return workedHours;
   }
 
   // Standard shift: OT = time after shift end
