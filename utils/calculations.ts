@@ -194,11 +194,14 @@ export function calculateMonthlyPayroll(
       const rawOT = recalcOTFromPunch(record, employee, shifts);
       const flooredOT = Math.floor(rawOT * 2) / 2; // 3.52->3.5, 6.12->6.0
       if (flooredOT <= 0) return;                   // skip if no OT
+      const isSunRec = new Date(record.date).getDay() === 0;
+      const recShift = shifts?.find((s: Shift) => s.id === employee.shiftId);
+      const isFullDaySun = isSunRec && recShift?.sundaySchedule?.enabled && recShift?.sundaySchedule?.isFullDayOvertime;
 
       let dailyPayableHours = flooredOT;
 
       // Apply global OT rules (threshold -> payout remapping)
-      if (config.otConfig?.enabled && config.otConfig.rules && config.otConfig.rules.length > 0) {
+      if (!isFullDaySun && config.otConfig?.enabled && config.otConfig.rules && config.otConfig.rules.length > 0) {
         const otMinutes = flooredOT * 60;
         const applicableRules = config.otConfig.rules.filter((r: any) =>
           r.enabled && (r.department === 'All Departments' || r.department === employee.department)
