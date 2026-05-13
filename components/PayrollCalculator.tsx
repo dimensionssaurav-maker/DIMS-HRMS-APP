@@ -34,7 +34,13 @@ interface Props {
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const YEARS = [2023, 2024, 2025, 2026, 2027];
 
-const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, year, onMonthChange, onYearChange }) => {
+const PayrollCalculator: React.FC<Props> = ({
+  // ── Currency formatter: rounds to 2 dp, fixes float precision ──
+  const fmt = (n: number): string => {
+    const v = Math.round((n || 0) * 100) / 100;
+    return v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+ employees, payroll, loans, month, year, onMonthChange, onYearChange }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingPayslip, setViewingPayslip] = useState<PayrollCalculation | null>(null);
   const [isExporting, setIsExporting] = useState<string | null>(null);
@@ -350,13 +356,13 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
                       {pay.totalOvertimeHours}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-medium text-amber-600">
-                      +₹{pay.overtimePay.toLocaleString()}
+                      +₹{fmt(pay.overtimePay)}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-medium text-orange-600">
                       {pay.foodingAllowance > 0 ? `+₹${pay.foodingAllowance.toLocaleString()}` : '-'}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-medium text-slate-600">
-                      ₹{pay.grossSalary.toLocaleString()}
+                      ₹{fmt(pay.grossSalary)}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-medium text-purple-600">
                       {pay.expenseReimbursement > 0 ? `+₹${pay.expenseReimbursement.toLocaleString()}` : '-'}
@@ -368,7 +374,7 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
                     </td>
                     <td className="px-4 py-4 text-right text-sm font-medium text-rose-500">
                       {pay.lateDeduction > 0 ? (
-                        <span className="font-bold">-₹{pay.lateDeduction.toLocaleString()}</span>
+                        <span className="font-bold">-₹{fmt(pay.lateDeduction)}</span>
                       ) : '-'}
                     </td>
                     <td className="px-4 py-4 text-right text-sm font-medium text-orange-500">
@@ -378,7 +384,7 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
                     </td>
                     <td className="px-4 py-4 text-right text-sm font-medium text-orange-500">
                       {pay.earlyDeduction > 0 ? (
-                        <span className="font-bold">-₹{pay.earlyDeduction.toLocaleString()}</span>
+                        <span className="font-bold">-₹{fmt(pay.earlyDeduction)}</span>
                       ) : '-'}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-medium text-rose-500">
@@ -391,16 +397,16 @@ const PayrollCalculator: React.FC<Props> = ({ employees, payroll, loans, month, 
                       {pay.loanDeduction > 0 ? `-₹${pay.loanDeduction.toLocaleString()}` : '-'}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-black text-slate-800">
-                      ₹{pay.netPayable.toLocaleString()}
+                      ₹{fmt(pay.netPayable)}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-bold text-emerald-600">
-                      ₹{pay.serviceCharge.toLocaleString()}
+                      ₹{fmt(pay.serviceCharge)}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-bold text-slate-500">
-                      ₹{pay.esicEmployerShare.toLocaleString()}
+                      ₹{fmt(pay.esicEmployerShare)}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-bold text-slate-500">
-                      ₹{pay.lwfEmployerShare.toLocaleString()}
+                      ₹{fmt(pay.lwfEmployerShare)}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button 
