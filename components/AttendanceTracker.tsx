@@ -221,11 +221,9 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
       if (totalMinutes < 0) totalMinutes += 1440;
       const totalHours = totalMinutes / 60;
 
-      // --- Sunday full-day OT logic (unchanged) ---
-      if (isSundaySchedule && sundayConfig?.isFullDayOvertime) {
-          if (totalHours >= 6.5) return Math.max(8, Math.round(totalHours * 100) / 100);
-          return Math.round(totalHours * 100) / 100;
-      }
+      // --- Sunday full-day OT: mirrors OvertimeModule (no isFullDayOvertime gate) ---
+      if (totalHours >= 6.5) return Math.max(8, Math.round(totalHours * 100) / 100);
+      return Math.round(totalHours * 100) / 100;
 
       // --- OT = time worked AFTER shift end time ---
       let checkOutMins = toM(checkOut);
