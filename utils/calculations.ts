@@ -200,8 +200,24 @@ export function calculateMonthlyPayroll(
 
       let dailyPayableHours = flooredOT;
 
-      // Apply global OT rules (threshold -> payout remapping)
-      if (!isFullDaySun && config.otConfig?.enabled && config.otConfig.rules && config.otConfig.rules.length > 0) {
+      // Apply Factory OT Slab Rules (priority)
+      if (!isFullDaySun && config.factoryOTConfig?.enabled) {
+        const deptConfigs = config.factoryOTConfig.deptConfigs ?? [];
+        const deptCfg = deptConfigs.find((d: any) => d.enabled && d.department === employee.department)
+                     ?? deptConfigs.find((d: any) => d.enabled && d.department === 'All Departments');
+        if (deptCfg) {
+          const slabs: any[] = deptCfg.slabs ?? [];
+          const slab1 = slabs[0]; // Slab 1 = minimum gate
+          if (!slab1 || flooredOT < slab1.requiredHours) {
+            dailyPayableHours = 0; // below minimum → no OT
+          } else {
+            const sorted = [...slabs].sort((a: any, b: any) => b.requiredHours - a.requiredHours);
+            const matched = sorted.find((s: any) => flooredOT >= s.requiredHours);
+            if (matched) dailyPayableHours = Math.floor((matched.requiredHours + matched.bonusHours) * 2) / 2;
+          }
+        }
+      // Classic threshold → payout rules
+      } else if (!isFullDaySun && config.otConfig?.enabled && config.otConfig.rules && config.otConfig.rules.length > 0) {
         const otMinutes = flooredOT * 60;
         const applicableRules = config.otConfig.rules.filter((r: any) =>
           r.enabled && (r.department === 'All Departments' || r.department === employee.department)
