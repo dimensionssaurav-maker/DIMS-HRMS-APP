@@ -380,8 +380,26 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
         }
       } else {
         const coveredByGlobalHoliday = hol && !manualHolidayDates.has(date);
-        const isSundayOff = isSun && !hol;
-        if (coveredByGlobalHoliday || isSundayOff) holiday++;
+        if (isSun && !hol) {
+          // Sunday week-off rule: paid only if present ≥ 3 days (Mon–Sat) that week
+          const sunDate = new Date(date);
+          let weekPresent = 0;
+          for (let back = 1; back <= 6; back++) {
+            const wd = new Date(sunDate);
+            wd.setDate(sunDate.getDate() - back);
+            const wdStr = `${wd.getFullYear()}-${String(wd.getMonth()+1).padStart(2,'0')}-${String(wd.getDate()).padStart(2,'0')}`;
+            const wr = getMonthRecord(empId, wdStr);
+            if (wr) {
+              const ws = String(wr.status || '').toUpperCase();
+              const isWP = ws === 'PRESENT' || ws === 'HD' || ws === 'HALFDAY' || ws === 'HALF' || ws === 'P/H' || ws === 'H/P';
+              if (isWP) weekPresent++;
+            }
+          }
+          if (weekPresent >= 3) holiday++;
+          // else: unpaid Sunday
+        } else if (coveredByGlobalHoliday) {
+          holiday++;
+        }
       }
     });
 
