@@ -42,7 +42,7 @@ function recalcOTFromPunch(record: any, employee: any, shifts: Shift[]): number 
 
     if (sd.isFullDayOvertime) {
       // Sunday full-day OT: worked >= 7h -> pay 8h (or actual if > 8)
-      if (workedHours >= 7) return Math.max(8, workedHours);
+      if (workedHours >= 6.5) return Math.max(8, workedHours);
       return workedHours;
     }
     // Sunday with partial OT: OT = time after Sunday shift end
