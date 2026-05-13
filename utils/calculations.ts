@@ -181,6 +181,7 @@ export function calculateMonthlyPayroll(
 
   let overtimePay = 0;
   let foodingAllowance = 0;
+  let payableOT = totalOvertimeHours;
 
   if (employee.isOtAllowed) {
     // Guard multiplier against undefined/NaN -> default to 1 (1x pay)
@@ -220,6 +221,7 @@ export function calculateMonthlyPayroll(
     });
 
     overtimePay = effectiveTotalPayableOT * (isNaN(hourlyRate) ? 0 : hourlyRate) * multiplier;
+    payableOT = effectiveTotalPayableOT;
   }
 
   let totalLateHours  = 0;
@@ -343,7 +345,7 @@ export function calculateMonthlyPayroll(
     daysPresent,
     daysAbsent,
     holidays: totalPaidHolidays,
-    totalOvertimeHours: effectiveTotalPayableOT,
+    totalOvertimeHours: payableOT,
     totalLateMinutes,
     basicSalary: roundedBasicSalary,
     grossSalary,
