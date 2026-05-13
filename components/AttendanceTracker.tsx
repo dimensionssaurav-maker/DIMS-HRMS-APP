@@ -223,7 +223,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
 
       // --- Sunday full-day OT logic (unchanged) ---
       if (isSundaySchedule && sundayConfig?.isFullDayOvertime) {
-          if (totalHours >= 7) return Math.max(8, Math.round(totalHours * 100) / 100);
+          if (totalHours >= 6.5) return Math.max(8, Math.round(totalHours * 100) / 100);
           return Math.round(totalHours * 100) / 100;
       }
 
