@@ -27,6 +27,12 @@ const MONTHS_ORDER = [
 ];
 
 const ESICReportSection: React.FC<Props> = ({ payroll, employees, year, month, departmentFilter }) => {
+  // ── Currency formatter: rounds to 2 dp, fixes float precision ──
+  const fmt = (n: number): string => {
+    const v = Math.round((n || 0) * 100) / 100;
+    return v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
   const [viewType, setViewType] = useState<'yearly' | 'monthly'>('yearly');
   const [isExporting, setIsExporting] = useState<string | null>(null);
 
@@ -215,12 +221,12 @@ const ESICReportSection: React.FC<Props> = ({ payroll, employees, year, month, d
            <div className="grid grid-cols-2 gap-4">
              <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Employer Share</p>
-               <p className="text-lg font-black text-emerald-600">₹{totals.employer.toLocaleString()}</p>
+               <p className="text-lg font-black text-emerald-600">₹{fmt(totals.employer)}</p>
                <p className="text-[9px] text-emerald-600/60 font-medium">3.25%</p>
              </div>
              <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Employee Share</p>
-               <p className="text-lg font-black text-rose-600">₹{totals.employee.toLocaleString()}</p>
+               <p className="text-lg font-black text-rose-600">₹{fmt(totals.employee)}</p>
                <p className="text-[9px] text-rose-600/60 font-medium">0.75%</p>
              </div>
            </div>
@@ -296,10 +302,10 @@ const ESICReportSection: React.FC<Props> = ({ payroll, employees, year, month, d
                                             <div className="font-bold text-slate-700">{emp?.name}</div>
                                             <div className="text-[10px] text-slate-400">{emp?.department}</div>
                                         </td>
-                                        <td className="px-6 py-3 text-right font-mono text-slate-600">₹{d.grossSalary.toLocaleString()}</td>
-                                        <td className="px-6 py-3 text-right font-medium text-rose-600">₹{d.esicEmployeeShare}</td>
-                                        <td className="px-6 py-3 text-right font-medium text-emerald-600">₹{d.esicEmployerShare}</td>
-                                        <td className="px-6 py-3 text-right font-bold text-slate-800">₹{d.esicEmployeeShare + d.esicEmployerShare}</td>
+                                        <td className="px-6 py-3 text-right font-mono text-slate-600">₹{fmt(d.grossSalary)}</td>
+                                        <td className="px-6 py-3 text-right font-medium text-rose-600">₹{fmt(d.esicEmployeeShare)}</td>
+                                        <td className="px-6 py-3 text-right font-medium text-emerald-600">₹{fmt(d.esicEmployerShare)}</td>
+                                        <td className="px-6 py-3 text-right font-bold text-slate-800">₹{fmt(d.esicEmployeeShare + d.esicEmployerShare)}</td>
                                     </tr>
                                 );
                             })}
