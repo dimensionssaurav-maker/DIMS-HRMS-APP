@@ -97,7 +97,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
   };
 
   const exportMonthlyCSV = (days: string[]) => {
-    const headers = ['Employee', 'ID', ...days.map(d => d.slice(8)), 'Present', 'Absent', 'Leave', 'Holiday', 'HALFDAY', 'OT Hrs', 'DAYS PAID'];
+    const headers = ['Employee', 'ID', ...days.map(d => d.slice(8)), 'Present', 'Absent', 'Leave', 'Holiday', 'HALFDAY', 'OT Actual', 'OT Payable', 'DAYS PAID'];
     const rows = employees.map(emp => {
       const summary = getEmpMonthlySummary(emp.id, days);
       const halfDays = days.filter(date => {
@@ -118,7 +118,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
         if (r.status === 'HOLIDAY' as AttendanceStatus) return 'H';
         return '-';
       });
-      return [emp.name, emp.employeeCode || emp.id, ...dayCells, summary.present, summary.absent, summary.leave, summary.holiday, halfDays, summary.totalOT, daysPaid];
+      return [emp.name, emp.employeeCode || emp.id, ...dayCells, summary.present, summary.absent, summary.leave, summary.holiday, halfDays, summary.totalOTActual, summary.totalOTPayable, daysPaid];
     });
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -270,8 +270,56 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
   // getEmpMonthlySummary MUST live after getEffectiveOT so it can call it.
   // Using getEffectiveOT ensures OT is recalculated from punch times when
   // overtimeHours is 0 in the stored record (common for biometric imports).
+  const toMinutes = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+
+  const calcOTActual = (r, emp) => {
+    if (!emp?.isOtAllowed) return 0;
+    const checkIn  = r.checkIn  || r.punchIn  || '';
+    const checkOut = r.checkOut || r.punchOut || '';
+    const shift = shifts?.find(s => s.id === emp.shiftId);
+    if (!checkIn || !checkOut || !shift) return Math.floor((r.overtimeHours ?? 0) * 2) / 2;
+    const isSunday = new Date(r.date).getDay() === 0;
+    if (isSunday && shift.sundaySchedule?.enabled) {
+      const sd = shift.sundaySchedule;
+      let sunEnd = toMinutes(sd.endTime);
+      const ciM = toMinutes(checkIn);
+      let coM = toMinutes(checkOut);
+      if (sunEnd < toMinutes(sd.startTime)) sunEnd += 1440;
+      if (coM < ciM) coM += 1440;
+      const worked = (coM - ciM) / 60;
+      if (sd.isFullDayOvertime) {
+        const raw = worked >= 7 ? Math.max(8, worked) : worked;
+        return Math.floor(raw * 2) / 2;
+      }
+      let cOut = coM; if (cOut < sunEnd - 600) cOut += 1440;
+      return Math.floor(Math.max(0, (cOut - sunEnd) / 60) * 2) / 2;
+    }
+    const shiftEndMins = toMinutes(shift.endTime);
+    let cOut = toMinutes(checkOut);
+    if (cOut < shiftEndMins - 600) cOut += 1440;
+    return Math.floor(Math.max(0, (cOut - shiftEndMins) / 60) * 2) / 2;
+  };
+
+  const calcOTPayable = (r, emp, otActual) => {
+    if (!emp?.isOtAllowed || otActual <= 0) return 0;
+    const shift = shifts?.find(s => s.id === emp.shiftId);
+    const isSunday = new Date(r.date).getDay() === 0;
+    const isFullDaySun = isSunday && shift?.sundaySchedule?.enabled && shift?.sundaySchedule?.isFullDayOvertime;
+    if (isFullDaySun) return otActual;
+    if (payrollConfig?.otConfig?.enabled && payrollConfig.otConfig.rules?.length > 0) {
+      const otMins = otActual * 60;
+      const rules = payrollConfig.otConfig.rules.filter(rule =>
+        rule.enabled && (rule.department === 'All Departments' || rule.department === emp.department)
+      );
+      for (const rule of rules) {
+        if (otMins >= rule.thresholdMinutes) return rule.payoutAmount;
+      }
+    }
+    return otActual;
+  };
+
   const getEmpMonthlySummary = (empId: string, days: string[]) => {
-    let present = 0, absent = 0, leave = 0, holiday = 0, late = 0, totalOT = 0, halfDays = 0;
+    let present = 0, absent = 0, leave = 0, holiday = 0, late = 0, totalOTActual = 0, totalOTPayable = 0, halfDays = 0;
     const emp = employees.find(e => e.id === empId);
     const joinDay = emp?.joiningDate
       ? (() => { const d = new Date(emp.joiningDate); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); })()
@@ -302,8 +350,11 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
         else if (r.status === 'LEAVE' as AttendanceStatus) leave++;
         else if (r.status === 'HOLIDAY' as AttendanceStatus) holiday++;
         if (r.lateMinutes && r.lateMinutes > 0) late++;
-        // Use getEffectiveOT so punch-time OT is counted even when overtimeHours=0
-        totalOT += emp ? getEffectiveOT(r, emp, date) : (r.overtimeHours || 0);
+        if (emp) {
+          const otA = calcOTActual(r, emp);
+          totalOTActual += otA;
+          totalOTPayable += calcOTPayable(r, emp, otA);
+        }
       } else {
         const coveredByGlobalHoliday = hol && !manualHolidayDates.has(date);
         const isSundayOff = isSun && !hol;
@@ -320,19 +371,8 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
       const dCfg = factoryCfg2.deptConfigs.find((d: any) => d.enabled && (d.department === 'All Departments' || d.department === emp?.department));
       if (dCfg?.slabs?.length > 0) deptSlabs = dCfg.slabs;
     }
-    let totalOTPayable = 0;
-    days.forEach(date => {
-      const r2 = getMonthRecord(empId, date);
-      if (!r2) return;
-      // Use getEffectiveOT — covers both stored and punch-time-derived OT
-      const effectiveOT = emp ? getEffectiveOT(r2, emp, date) : (r2.overtimeHours || 0);
-      if (effectiveOT <= 0) return;
-      const floored = Math.floor(effectiveOT * 2) / 2;
-      if (floored <= 0) return;
-      totalOTPayable += deptSlabs ? calcFactoryOTPayable(floored, deptSlabs) : floored;
-    });
-
-    return { present, absent, leave, holiday, late, totalOT, halfDays, daysPaid, totalOTPayable };
+    
+    return { present, absent, leave, holiday, late, totalOTActual, totalOTPayable, halfDays, daysPaid }
   };
 
   const handleStatusChange = (empId: string, status: AttendanceStatus) => {
@@ -948,7 +988,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                         <td className="px-2 py-2 text-center font-black text-red-600 bg-red-50/50 border-r border-slate-100">{summary.absent > 0 ? summary.absent : '—'}</td>
                         <td className="px-2 py-2 text-center font-black text-amber-600 bg-amber-50/50 border-r border-slate-100">{summary.leave > 0 ? summary.leave : '—'}</td>
                         <td className="px-2 py-2 text-center font-black text-purple-600 bg-purple-50/50 border-r border-slate-100">{summary.holiday > 0 ? summary.holiday : '—'}</td>
-                        <td className="px-2 py-2 text-center font-black text-orange-600 bg-orange-50/50 border-r border-slate-100">{summary.totalOT > 0 ? summary.totalOT.toFixed(1) : '—'}</td>
+                        <td className="px-2 py-2 text-center font-black text-orange-600 bg-orange-50/50 border-r border-slate-100">{summary.totalOTActual > 0 ? summary.totalOTActual.toFixed(1) : '—'}</td>
                         <td className="px-2 py-2 text-center font-black text-rose-700 bg-rose-50/50 border-r border-slate-100">{summary.totalOTPayable > 0 ? summary.totalOTPayable.toFixed(1) : '—'}</td>
                         <td className="px-2 py-2 text-center font-black text-sky-600 bg-sky-50/50 border-r border-slate-100">{summary.halfDays > 0 ? summary.halfDays : '—'}</td>
                         <td className="px-2 py-2 text-center font-black text-indigo-700 bg-indigo-50/50 font-extrabold">{summary.daysPaid > 0 ? summary.daysPaid.toFixed(1).replace('.0','') : '0'}</td>
@@ -986,7 +1026,7 @@ const AttendanceTracker: React.FC<Props> = ({ employees, shifts, records, holida
                       {employees.reduce((s, emp) => s + getEmpMonthlySummary(emp.id, monthDays).holiday, 0)}
                     </td>
                     <td className="px-2 py-2 text-center text-orange-300 font-black bg-orange-900/20 border-r border-slate-700">
-                      {employees.reduce((s, emp) => s + getEmpMonthlySummary(emp.id, monthDays).totalOT, 0).toFixed(1)}
+                      {employees.reduce((s, emp) => s + getEmpMonthlySummary(emp.id, monthDays).totalOTActual, 0).toFixed(1)}
                     </td>
                     <td className="px-2 py-2 text-center text-rose-300 font-black bg-rose-900/20 border-r border-slate-700">
                       {employees.reduce((s, emp) => s + getEmpMonthlySummary(emp.id, monthDays).totalOTPayable, 0).toFixed(1)}
