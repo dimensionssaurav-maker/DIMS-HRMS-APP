@@ -202,7 +202,7 @@ const ESICReportSection: React.FC<Props> = ({ payroll, employees, year, month, d
         <div className="space-y-4 lg:col-span-1">
            <div className="bg-indigo-600 p-5 rounded-2xl text-white shadow-lg shadow-indigo-100">
              <p className="text-xs font-bold text-indigo-200 uppercase tracking-widest mb-1">Total Contribution</p>
-             <p className="text-3xl font-black">₹{totals.total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+             <p className="text-3xl font-black">₹{fmt(totals.total)}</p>
              <p className="text-[10px] text-indigo-100 mt-2 opacity-80">
                 {viewType === 'yearly' ? 'Accumulated YTD' : `For ${month} ${year}`}
              </p>
