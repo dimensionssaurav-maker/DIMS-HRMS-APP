@@ -30,7 +30,7 @@ import EarlyLeaveReportSection from './components/EarlyLeaveReportSection.tsx';
 import LeftEmployeesReportSection from './components/LeftEmployeesReportSection.tsx';
 import ServiceChargeReportSection from './components/ServiceChargeReportSection.tsx';
 
-import { Employee, AttendanceRecord, Expense, ExpenseClaim, LeaveRequest, Shift, Loan, PayrollConfig, Holiday, SystemUser, ContractorPayment, ContractorAdvance } from './types.ts';
+import { Employee, AttendanceRecord, Expense, ExpenseClaim, LeaveRequest, Shift, Loan, PayrollConfig, Holiday, SystemUser, ContractorPayment, ContractorAdvance, SiteExpense } from './types.ts';
 import { AttendanceStatus, ExpenseCategory } from './enums';
 import { calculateMonthlyPayroll } from './utils/calculations.ts';
 
@@ -82,6 +82,7 @@ export default function App() {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [siteExpenses, setSiteExpenses] = useState<SiteExpense[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [contractorPayments, setContractorPayments] = useState<ContractorPayment[]>([]);
@@ -122,7 +123,7 @@ export default function App() {
   useEffect(() => {
     const loadAll = async () => {
       try {
-        const [emps, att, leavs, shfts, lns, clms, settingsDocs, usersDocs, deptDocs, holDocs, secDocs, contractorDocs, advanceDocs] = await Promise.all([
+        const [emps, att, leavs, shfts, lns, clms, settingsDocs, usersDocs, deptDocs, holDocs, secDocs, contractorDocs, advanceDocs, siteExpDocs] = await Promise.all([
           getData("employees"),
           getData("attendance"),
           getData("leaves"),
@@ -136,6 +137,7 @@ export default function App() {
           getData("security"),
           getData("contractorPayments"),
           getData("contractorAdvances"),
+          getData("siteExpenses"),
         ]);
         const empList: Employee[] = Array.isArray(emps) ? emps as Employee[] : [];
         const attList: any[] = Array.isArray(att) ? att : [];
@@ -219,6 +221,7 @@ export default function App() {
         setLeaveRequests(Array.isArray(leavs) ? leavs as LeaveRequest[] : []);
         setShifts(Array.isArray(shfts) ? shfts as Shift[] : []);
         setLoans(Array.isArray(lns) ? lns as Loan[] : []);
+        setSiteExpenses(Array.isArray(siteExpDocs) ? siteExpDocs as SiteExpense[] : []);
         setClaims(Array.isArray(clms) ? clms as ExpenseClaim[] : []);
 
         if (Array.isArray(settingsDocs) && settingsDocs.length > 0) {
@@ -452,6 +455,20 @@ export default function App() {
       await deleteData("loans", id);
       setLoans(prev => prev.filter(l => l.id !== id));
     } catch (e) { console.error("Delete loan error:", e); }
+  };
+
+
+  const handleAddSiteExpense = async (se: SiteExpense) => {
+    try {
+      const ref = await addData("siteExpenses", se);
+      setSiteExpenses(prev => [...prev, { ...se, id: ref.id }]);
+    } catch (e) { console.error("Save site expense error:", e); }
+  };
+  const handleDeleteSiteExpense = async (id: string) => {
+    try {
+      await deleteData("siteExpenses", id);
+      setSiteExpenses(prev => prev.filter(s => s.id !== id));
+    } catch (e) { console.error("Delete site expense error:", e); }
   };
 
   const handleAddContractorPayment = async (p: ContractorPayment) => {
@@ -707,7 +724,7 @@ export default function App() {
           <ShiftManagement shifts={shifts} onAdd={handleAddShift} onUpdate={handleUpdateShift} onDelete={handleDeleteShift} />
         );
       case 'payroll':
-        return <PayrollCalculator employees={employees} payroll={payrollData} loans={loans} month={selectedMonth} year={selectedYear} onMonthChange={setSelectedMonth} onYearChange={setSelectedYear} />;
+        return <PayrollCalculator employees={employees} payroll={payrollData} loans={loans} siteExpenses={siteExpenses} onAddSiteExpense={handleAddSiteExpense} onDeleteSiteExpense={handleDeleteSiteExpense} month={selectedMonth} year={selectedYear} onMonthChange={setSelectedMonth} onYearChange={setSelectedYear} />;
       case 'expenses':
         return (
           <ExpenseTracker
