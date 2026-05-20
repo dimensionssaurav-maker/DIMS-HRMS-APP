@@ -35,12 +35,12 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 const YEARS = [2023, 2024, 2025, 2026, 2027];
 
 const PayrollCalculator: React.FC<Props> = ({
+ employees, payroll, loans, month, year, onMonthChange, onYearChange }) => {
   // ── Currency formatter: rounds to 2 dp, fixes float precision ──
   const fmt = (n: number): string => {
     const v = Math.round((n || 0) * 100) / 100;
     return v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
- employees, payroll, loans, month, year, onMonthChange, onYearChange }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingPayslip, setViewingPayslip] = useState<PayrollCalculation | null>(null);
   const [isExporting, setIsExporting] = useState<string | null>(null);
