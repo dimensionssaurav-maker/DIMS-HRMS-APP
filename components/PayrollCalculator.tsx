@@ -443,7 +443,6 @@ const PayrollCalculator: React.FC<Props> = ({
                   <td className="px-6 py-4 text-right text-sm font-bold text-orange-600">₹{columnTotals.fooding.toLocaleString()}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-indigo-600">₹{fmt(columnTotals.travel)}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-amber-700 bg-amber-50/40">₹{fmt(columnTotals.cash)}</td>
-                  <td className="px-6 py-4</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-slate-800">₹{columnTotals.gross.toLocaleString()}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-purple-600">+₹{columnTotals.expenseReimbursement.toLocaleString()}</td>
                   <td className="px-4 py-4 text-right text-sm font-bold text-rose-600">{filteredPayroll.reduce((s,p) => s + (p.lateCount||0), 0) > 0 ? filteredPayroll.reduce((s,p) => s + (p.lateCount||0), 0) : '-'}</td>
