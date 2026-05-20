@@ -17,14 +17,19 @@ import {
   Clock,
   Utensils,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  MapPin,
+  Trash2
 } from 'lucide-react';
-import { Employee, PayrollCalculation, Loan } from '../types';
+import { Employee, PayrollCalculation, Loan, SiteExpense } from '../types';
 
 interface Props {
   employees: Employee[];
   payroll: PayrollCalculation[];
   loans: Loan[];
+  siteExpenses: SiteExpense[];
+  onAddSiteExpense: (se: SiteExpense) => void;
+  onDeleteSiteExpense: (id: string) => void;
   month: string;
   year: number;
   onMonthChange?: (month: string) => void;
@@ -35,7 +40,7 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 const YEARS = [2023, 2024, 2025, 2026, 2027];
 
 const PayrollCalculator: React.FC<Props> = ({
- employees, payroll, loans, month, year, onMonthChange, onYearChange }) => {
+ employees, payroll, loans, siteExpenses, onAddSiteExpense, onDeleteSiteExpense, month, year, onMonthChange, onYearChange }) => {
   // ── Currency formatter: rounds to 2 dp, fixes float precision ──
   const fmt = (n: number): string => {
     const v = Math.round((n || 0) * 100) / 100;
@@ -44,8 +49,17 @@ const PayrollCalculator: React.FC<Props> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingPayslip, setViewingPayslip] = useState<PayrollCalculation | null>(null);
   const [isExporting, setIsExporting] = useState<string | null>(null);
+  const [siteExpModal, setSiteExpModal] = useState<{empId: string; empName: string} | null>(null);
+  const [siteForm, setSiteForm] = useState({ fromDate: '', toDate: '', foodingAmt: 0, travelAmt: 0, stayAmt: 0, miscAmt: 0, notes: '' });
+  const [showSiteList, setShowSiteList] = useState<string | null>(null);
 
   const getEmployee = (id: string) => employees.find(e => e.id === id);
+
+  const getSiteCash = (empId: string): number => {
+    const mNum = MONTHS.indexOf(month) + 1;
+    return (siteExpenses || []).filter(se => se.employeeId === empId && se.month === mNum && se.year === year)
+      .reduce((sum, se) => sum + (se.foodingAmt||0) + (se.travelAmt||0) + (se.stayAmt||0) + (se.miscAmt||0), 0);
+  };
 
   // Filter out LEAVERS and apply search
   const filteredPayroll = useMemo(() => {
@@ -82,7 +96,8 @@ const PayrollCalculator: React.FC<Props> = ({
       lwfEmployer: acc.lwfEmployer + curr.lwfEmployerShare,
       loanDeduction: acc.loanDeduction + curr.loanDeduction,
       serviceCharge: acc.serviceCharge + curr.serviceCharge,
-      netPayable: acc.netPayable + curr.netPayable
+      netPayable: acc.netPayable + curr.netPayable,
+      siteCash: acc.siteCash + getSiteCash(curr.employeeId)
     }), { 
         gross: 0, 
         overtimeHours: 0, 
@@ -101,7 +116,8 @@ const PayrollCalculator: React.FC<Props> = ({
         lwfEmployer: 0,
         loanDeduction: 0, 
         serviceCharge: 0, 
-        netPayable: 0 
+        netPayable: 0,
+        siteCash: 0
     });
   }, [filteredPayroll]);
 
@@ -119,7 +135,7 @@ const PayrollCalculator: React.FC<Props> = ({
           'Employee ID', 'Name', 'Department', 'Designation', 
           'Days Paid', 'Total Overtime Hours', 'Overtime Pay', 'Fooding Allow.', 'Travel Allow.', 'Cash Total', 'Expenses', 'Gross Salary', 
           'Late Pts', 'Late Deduction', 'Early Pts', 'Early Deduction', 'ESIC Employee', 'LWF Employee', 'Loan Deduct', 
-          'Net Payable', 'Service Charge', 'ESIC Employer', 'LWF Employer'
+          'Net Payable', 'Site Cash Paid', 'Bank Transfer', 'Service Charge', 'ESIC Employer', 'LWF Employer'
         ];
         const rows = filteredPayroll.map(p => {
           const emp = getEmployee(p.employeeId);
@@ -144,6 +160,8 @@ const PayrollCalculator: React.FC<Props> = ({
             p.lwfEmployeeShare,
             p.loanDeduction,
             p.netPayable,
+            getSiteCash(p.employeeId),
+            p.netPayable - getSiteCash(p.employeeId),
             p.serviceCharge,
             p.esicEmployerShare,
             p.lwfEmployerShare
@@ -328,6 +346,8 @@ const PayrollCalculator: React.FC<Props> = ({
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">LWF (Emp)</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Loans</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Net Pay</th>
+                <th className="px-6 py-4 text-xs font-bold text-rose-600 uppercase tracking-wider text-right">Site Cash</th>
+                <th className="px-6 py-4 text-xs font-bold text-emerald-600 uppercase tracking-wider text-right">Bank Transfer</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Svc Chg</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">ESIC (Emplr)</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">LWF (Emplr)</th>
@@ -413,6 +433,41 @@ const PayrollCalculator: React.FC<Props> = ({
                     <td className="px-6 py-4 text-right text-sm font-black text-slate-800">
                       ₹{fmt(pay.netPayable)}
                     </td>
+                    <td className="px-6 py-4 text-right text-sm font-bold text-rose-600 relative">
+                      <div className="flex items-center justify-end gap-1">
+                        {getSiteCash(pay.employeeId) > 0 ? (
+                          <button onClick={() => setShowSiteList(showSiteList === pay.employeeId ? null : pay.employeeId)}
+                            className="text-rose-600 hover:underline text-sm font-bold">
+                            -₹{fmt(getSiteCash(pay.employeeId))}
+                          </button>
+                        ) : <span className="text-slate-300">-</span>}
+                        <button onClick={() => { setSiteExpModal({empId: pay.employeeId, empName: getEmployee(pay.employeeId)?.name || ""}); setSiteForm({fromDate:"",toDate:"",foodingAmt:0,travelAmt:0,stayAmt:0,miscAmt:0,notes:""}); }}
+                          className="ml-1 p-1 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors" title="Add Site Expense">
+                          <MapPin size={13} />
+                        </button>
+                      </div>
+                      {showSiteList === pay.employeeId && (() => {
+                        const mNum = MONTHS.indexOf(month)+1;
+                        const list = (siteExpenses||[]).filter(se=>se.employeeId===pay.employeeId&&se.month===mNum&&se.year===year);
+                        return list.length > 0 ? (
+                          <div className="absolute z-10 bg-white border border-rose-100 rounded-xl shadow-xl p-3 mt-1 min-w-[260px] right-0">
+                            {list.map(se => (
+                              <div key={se.id} className="flex items-center justify-between text-xs py-1 border-b border-slate-50 last:border-0">
+                                <div>
+                                  <p className="font-bold text-slate-700">{se.fromDate} → {se.toDate}</p>
+                                  <p className="text-slate-500">{[se.foodingAmt&&`F:₹${se.foodingAmt}`,se.travelAmt&&`T:₹${se.travelAmt}`,se.stayAmt&&`S:₹${se.stayAmt}`,se.miscAmt&&`M:₹${se.miscAmt}`].filter(Boolean).join(" | ")}</p>
+                                  {se.notes && <p className="text-slate-400 italic">{se.notes}</p>}
+                                </div>
+                                <button onClick={()=>onDeleteSiteExpense(se.id)} className="text-slate-300 hover:text-red-500 ml-2"><Trash2 size={12}/></button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null;
+                      })()}
+                    </td>
+                    <td className="px-6 py-4 text-right text-sm font-black text-emerald-700">
+                      ₹{fmt(pay.netPayable - getSiteCash(pay.employeeId))}
+                    </td>
                     <td className="px-6 py-4 text-right text-sm font-bold text-emerald-600">
                       ₹{fmt(pay.serviceCharge)}
                     </td>
@@ -453,6 +508,8 @@ const PayrollCalculator: React.FC<Props> = ({
                   <td className="px-6 py-4 text-right text-sm font-bold text-rose-600">-₹{columnTotals.lwfEmployee.toLocaleString()}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-amber-600">-₹{columnTotals.loanDeduction.toLocaleString()}</td>
                   <td className="px-6 py-4 text-right text-sm font-black text-slate-900">₹{columnTotals.netPayable.toLocaleString()}</td>
+                  <td className="px-6 py-4 text-right text-sm font-bold text-rose-600">-₹{fmt(columnTotals.siteCash)}</td>
+                  <td className="px-6 py-4 text-right text-sm font-black text-emerald-700">₹{fmt(columnTotals.netPayable - columnTotals.siteCash)}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-emerald-600">₹{columnTotals.serviceCharge.toLocaleString()}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-slate-600">₹{columnTotals.esicEmployer.toLocaleString()}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-slate-600">₹{columnTotals.lwfEmployer.toLocaleString()}</td>
@@ -711,6 +768,111 @@ const PayrollCalculator: React.FC<Props> = ({
           </div>
         </div>
       )}
+
+      {/* ── Site Expense Modal ── */}
+      {siteExpModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-lg font-black text-slate-800">Site / Field Expense</h2>
+                <p className="text-sm text-slate-500">{siteExpModal.empName} — {month} {year}</p>
+              </div>
+              <button onClick={() => setSiteExpModal(null)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors"><X size={18}/></button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase">From Date</label>
+                  <input type="date" value={siteForm.fromDate}
+                    onChange={e => setSiteForm(p => ({...p, fromDate: e.target.value}))}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:border-indigo-400" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase">To Date</label>
+                  <input type="date" value={siteForm.toDate}
+                    onChange={e => setSiteForm(p => ({...p, toDate: e.target.value}))}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:border-indigo-400" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase">Fooding ₹</label>
+                  <input type="number" min="0" value={siteForm.foodingAmt || ''}
+                    onChange={e => setSiteForm(p => ({...p, foodingAmt: parseFloat(e.target.value)||0}))}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:border-indigo-400" placeholder="0" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase">Travel ₹</label>
+                  <input type="number" min="0" value={siteForm.travelAmt || ''}
+                    onChange={e => setSiteForm(p => ({...p, travelAmt: parseFloat(e.target.value)||0}))}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:border-indigo-400" placeholder="0" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase">Stay ₹</label>
+                  <input type="number" min="0" value={siteForm.stayAmt || ''}
+                    onChange={e => setSiteForm(p => ({...p, stayAmt: parseFloat(e.target.value)||0}))}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:border-indigo-400" placeholder="0" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase">Misc ₹</label>
+                  <input type="number" min="0" value={siteForm.miscAmt || ''}
+                    onChange={e => setSiteForm(p => ({...p, miscAmt: parseFloat(e.target.value)||0}))}
+                    className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:border-indigo-400" placeholder="0" />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase">Notes</label>
+                <input type="text" value={siteForm.notes}
+                  onChange={e => setSiteForm(p => ({...p, notes: e.target.value}))}
+                  className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-400" placeholder="e.g. Manesar site visit" />
+              </div>
+
+              <div className="bg-slate-50 rounded-xl px-4 py-3 flex justify-between items-center">
+                <span className="text-sm font-bold text-slate-600">Total Cash Paid</span>
+                <span className="text-xl font-black text-rose-600">
+                  ₹{fmt((siteForm.foodingAmt||0)+(siteForm.travelAmt||0)+(siteForm.stayAmt||0)+(siteForm.miscAmt||0))}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setSiteExpModal(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                Cancel
+              </button>
+              <button
+                disabled={!siteForm.fromDate || ((siteForm.foodingAmt||0)+(siteForm.travelAmt||0)+(siteForm.stayAmt||0)+(siteForm.miscAmt||0)) <= 0}
+                onClick={() => {
+                  const mNum = MONTHS.indexOf(month) + 1;
+                  const se: SiteExpense = {
+                    id: '',
+                    employeeId: siteExpModal.empId,
+                    month: mNum,
+                    year,
+                    fromDate: siteForm.fromDate,
+                    toDate: siteForm.toDate || siteForm.fromDate,
+                    foodingAmt: siteForm.foodingAmt,
+                    travelAmt: siteForm.travelAmt,
+                    stayAmt: siteForm.stayAmt,
+                    miscAmt: siteForm.miscAmt,
+                    notes: siteForm.notes,
+                    createdAt: new Date().toISOString(),
+                  };
+                  onAddSiteExpense(se);
+                  setSiteExpModal(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
