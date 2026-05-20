@@ -245,6 +245,21 @@ export interface ContractorAdvance {
   createdAt: string;
 }
 
+export interface SiteExpense {
+  id: string;
+  employeeId: string;
+  month: number;
+  year: number;
+  fromDate: string;
+  toDate: string;
+  foodingAmt: number;
+  travelAmt: number;
+  stayAmt: number;
+  miscAmt: number;
+  notes: string;
+  createdAt: string;
+}
+
 export interface MonthlyReport {
   month: string;
   year: number;
