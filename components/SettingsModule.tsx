@@ -81,6 +81,9 @@ const SettingsModule: React.FC<Props> = ({ payrollConfig, onUpdatePayrollConfig,
   const [newFoodingDept, setNewFoodingDept] = useState('');
   const [newFoodingMinHours, setNewFoodingMinHours] = useState(4);
   const [newFoodingAmount, setNewFoodingAmount] = useState(50);
+  const [newTravelDept, setNewTravelDept] = useState('');
+  const [newTravelMinHours, setNewTravelMinHours] = useState(0);
+  const [newTravelAmount, setNewTravelAmount] = useState(50);
 
   // Local state for Recruitment
   const [newSource, setNewSource] = useState('');
