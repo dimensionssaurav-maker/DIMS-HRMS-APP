@@ -1,7 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Car, 
-  User, 
+import { Bus, User, 
   Settings, 
   Bell, 
   Shield, 
@@ -788,7 +787,7 @@ const SettingsModule: React.FC<Props> = ({ payrollConfig, onUpdatePayrollConfig,
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="font-bold text-slate-700 flex items-center gap-2">
-                      <Car size={18} className="text-indigo-600" /> Travel Allowance <span className="text-xs font-normal text-slate-400 ml-1">(Cash)</span>
+                      <Bus size={18} className="text-indigo-600" /> Travel Allowance <span className="text-xs font-normal text-slate-400 ml-1">(Cash)</span>
                     </h4>
                     <button
                       onClick={() => setLocalPayrollConfig((prev: any) => ({
