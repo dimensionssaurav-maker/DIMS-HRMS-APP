@@ -83,8 +83,6 @@ const PayrollCalculator: React.FC<Props> = ({
       overtimeHours: acc.overtimeHours + curr.totalOvertimeHours,
       overtime: acc.overtime + curr.overtimePay,
       fooding: acc.fooding + curr.foodingAllowance,
-      travel: acc.travel + (curr as any).travelAllowance,
-      cash: acc.cash + (curr as any).cashDisbursement,
       expenseReimbursement: acc.expenseReimbursement + curr.expenseReimbursement,
       lateHours: acc.lateHours + (curr.lateHours || 0),
       lateDeduction: acc.lateDeduction + curr.lateDeduction,
@@ -103,8 +101,6 @@ const PayrollCalculator: React.FC<Props> = ({
         overtimeHours: 0, 
         overtime: 0, 
         fooding: 0,
-    travel: 0,
-    cash: 0, 
         expenseReimbursement: 0, 
         lateHours: 0,
         lateDeduction: 0, 
@@ -133,7 +129,7 @@ const PayrollCalculator: React.FC<Props> = ({
       if (type === 'csv') {
         const headers = [
           'Employee ID', 'Name', 'Department', 'Designation', 
-          'Days Paid', 'Total Overtime Hours', 'Overtime Pay', 'Fooding Allow.', 'Travel Allow.', 'Cash Total', 'Expenses', 'Gross Salary', 
+          'Days Paid', 'Total Overtime Hours', 'Overtime Pay', 'Fooding Allow.', 'Expenses', 'Gross Salary', 
           'Late Pts', 'Late Deduction', 'Early Pts', 'Early Deduction', 'ESIC Employee', 'LWF Employee', 'Loan Deduct', 
           'Net Payable', 'Site Cash Paid', 'Bank Transfer', 'Service Charge', 'ESIC Employer', 'LWF Employer'
         ];
@@ -148,8 +144,6 @@ const PayrollCalculator: React.FC<Props> = ({
             p.totalOvertimeHours,
             p.overtimePay,
             p.foodingAllowance,
-      (p as any).travelAllowance ?? 0,
-      (p as any).cashDisbursement ?? 0,
             p.expenseReimbursement,
             p.grossSalary,
             p.lateCount || 0,
@@ -334,8 +328,6 @@ const PayrollCalculator: React.FC<Props> = ({
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">OT Hrs</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">OT Pay</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Fooding</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Travel</th>
-                    <th className="px-6 py-4 text-xs font-bold text-amber-600 uppercase tracking-wider text-right">Cash Total</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Gross</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Expenses</th>
                 <th className="px-4 py-4 text-xs font-bold text-rose-500 uppercase tracking-wider text-right">Late Pts</th>
@@ -389,11 +381,6 @@ const PayrollCalculator: React.FC<Props> = ({
                     <td className="px-6 py-4 text-right text-sm font-medium text-orange-600">
                       {pay.foodingAllowance > 0 ? `+₹${pay.foodingAllowance.toLocaleString()}` : '-'}
                   </td>
-                  <td className="px-6 py-4 text-right text-sm text-indigo-600">
-                    {(pay as any).travelAllowance > 0 ? `+₹${fmt((pay as any).travelAllowance)}` : '-'}
-                  </td>
-                  <td className="px-6 py-4 text-right text-sm font-bold text-amber-700 bg-amber-50/40">
-                    {(pay as any).cashDisbursement > 0 ? `₹${fmt((pay as any).cashDisbursement)}` : '-'}
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-medium text-slate-600">
                       ₹{fmt(pay.grossSalary)}
@@ -496,8 +483,6 @@ const PayrollCalculator: React.FC<Props> = ({
                   <td className="px-6 py-4 text-center text-sm font-bold text-slate-600">{columnTotals.overtimeHours}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-amber-600">₹{columnTotals.overtime.toLocaleString()}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-orange-600">₹{columnTotals.fooding.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-right text-sm font-bold text-indigo-600">₹{fmt(columnTotals.travel)}</td>
-                  <td className="px-6 py-4 text-right text-sm font-bold text-amber-700 bg-amber-50/40">₹{fmt(columnTotals.cash)}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-slate-800">₹{columnTotals.gross.toLocaleString()}</td>
                   <td className="px-6 py-4 text-right text-sm font-bold text-purple-600">+₹{columnTotals.expenseReimbursement.toLocaleString()}</td>
                   <td className="px-4 py-4 text-right text-sm font-bold text-rose-600">{filteredPayroll.reduce((s,p) => s + (p.lateCount||0), 0) > 0 ? filteredPayroll.reduce((s,p) => s + (p.lateCount||0), 0) : '-'}</td>
@@ -666,13 +651,7 @@ const PayrollCalculator: React.FC<Props> = ({
                       <span className="text-slate-500">Overtime Pay</span>
                       <span className="font-bold text-slate-700">₹{viewingPayslip.overtimePay.toLocaleString()}</span>
                     </div>
-                    {(viewingPayslip as any).travelAllowance > 0 && (
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-xs text-slate-500">Travel Allow. (Cash)</span>
-                <span className="font-bold text-indigo-600">+₹{fmt((viewingPayslip as any).travelAllowance)}</span>
-              </div>
-            )}
-            {viewingPayslip.foodingAllowance > 0 && (
+                    {viewingPayslip.foodingAllowance > 0 && (
                         <div className="flex justify-between text-sm">
                         <span className="text-slate-500">Food Allowance</span>
                         <span className="font-bold text-slate-700">₹{viewingPayslip.foodingAllowance.toLocaleString()}</span>
