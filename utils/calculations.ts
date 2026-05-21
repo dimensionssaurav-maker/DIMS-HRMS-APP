@@ -195,7 +195,6 @@ export function calculateMonthlyPayroll(
 
   let overtimePay = 0;
   let foodingAllowance = 0;
-  let travelAllowance = 0;
   let payableOT = totalOvertimeHours;
 
   if (employee.isOtAllowed) {
@@ -252,14 +251,6 @@ export function calculateMonthlyPayroll(
         if (flooredOT >= effectiveMinHours) foodingAllowance += effectiveAmount;
       }
 
-      // Travel allowance: paid in cash on days employee is present (or OT days)
-      if (!isSunday && (config as any).travelConfig?.enabled) {
-        const tc = (config as any).travelConfig;
-        const deptT = tc.departmentOverrides?.[employee.department];
-        const tMinHours = deptT ? deptT.minHours : (tc.minHours ?? 0);
-        const tAmount   = deptT ? deptT.amount   : (tc.amount ?? 0);
-        if (flooredOT >= tMinHours) travelAllowance += tAmount;
-      }
     });
 
     overtimePay = effectiveTotalPayableOT * (isNaN(hourlyRate) ? 0 : hourlyRate) * multiplier;
@@ -330,10 +321,8 @@ export function calculateMonthlyPayroll(
 
   overtimePay       = Math.round(overtimePay       * 100) / 100;
   foodingAllowance  = Math.round(foodingAllowance  * 100) / 100;
-  travelAllowance   = Math.round(travelAllowance   * 100) / 100;
   const roundedBasicSalary = Math.round(basicSalary * 100) / 100;
-  const cashDisbursement = Math.round((foodingAllowance + travelAllowance) * 100) / 100;
-  const grossSalary = roundedBasicSalary + overtimePay + foodingAllowance + travelAllowance;
+  const grossSalary = roundedBasicSalary + overtimePay + foodingAllowance;
 
   let expenseReimbursement = 0;
   if (claims) {
@@ -395,8 +384,6 @@ export function calculateMonthlyPayroll(
     grossSalary,
     overtimePay,
     foodingAllowance,
-    travelAllowance,
-    cashDisbursement,
     expenseReimbursement,
     esicEmployeeShare,
     esicEmployerShare,
