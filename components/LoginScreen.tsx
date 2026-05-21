@@ -183,38 +183,6 @@ const LoginScreen: React.FC<Props> = ({ users, onLogin, onUpdateUsers }) => {
           </form>
         </div>
 
-        {/* Demo accounts hint */}
-        <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-4">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-            <Shield size={12} /> Available Accounts
-          </p>
-          <div className="space-y-2">
-            {users.filter(u => u.status === 'Active').map(u => (
-              <button key={u.id} type="button"
-                onClick={() => { setEmail(u.email); setPassword(u.password || ''); setError(''); }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left transition-all hover:scale-[1.01] ${u.isLocked ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/5 cursor-pointer'} bg-white/[0.03] border-white/[0.06]`}
-                disabled={!!u.isLocked}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-full bg-indigo-800 text-indigo-300 flex items-center justify-center text-xs font-black">
-                    {u.name.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-200">{u.name}</p>
-                    <p className="text-[10px] text-slate-500">{u.email}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${ROLE_COLORS[u.role]}`}>
-                    {u.role}
-                  </span>
-                  {u.isLocked && <Lock size={10} className="text-red-400" />}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
         <p className="text-center text-slate-600 text-xs mt-4">
           DIMS HRMS · Factory Management · Secure Login
         </p>
